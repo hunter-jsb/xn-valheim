@@ -240,7 +240,7 @@ function fitBox(bx,by,bw,bh){
   apply();
 }
 // Zoom to what's actually been explored — a new world is almost entirely fog.
-function fitExplored(){
+function fitExplored(doFit = true){
   const N = 256, c = document.createElement("canvas");
   c.width = c.height = N;
   const g = c.getContext("2d", {willReadFrequently:true});
@@ -258,6 +258,7 @@ function fitExplored(){
   }
   EXPLORED = seen/(N*N);
   renderTiles();
+  if(!doFit) return;
   if(x1 < 0) return fitView();
   const k = SIZE/N;
   fitBox(x0*k, y0*k, (x1-x0+1)*k, (y1-y0+1)*k);
@@ -419,6 +420,16 @@ const fogImg = document.getElementById("mapFog");
 if(fogImg.complete) fitExplored(); else fogImg.addEventListener("load", fitExplored, {once:true});
 addEventListener("load", () => setTimeout(fitExplored, 30));
 load();
+
+// Keep an open tab current. The underlying data is only rewritten when the
+// scheduled job runs, so poll gently and never move the user's view.
+function refreshFog(){
+  const img = document.getElementById("mapFog");
+  const probe = new Image();
+  probe.onload = () => { img.src = probe.src; setTimeout(() => fitExplored(false), 60); };
+  probe.src = "./data/map/fog.png?" + Date.now();
+}
+setInterval(() => { load(); refreshFog(); }, 60000);
 </script>
 </body>
 </html>
