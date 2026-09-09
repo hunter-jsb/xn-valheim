@@ -63,6 +63,19 @@
   .msg .who{color:var(--gold);font-weight:600}
   .msg.sys{color:var(--muted);font-style:italic}
   .msg .t{color:#6b7065;font-size:.66rem;margin-left:.25rem}
+  #feed{height:230px;overflow-y:auto;background:#0f120e;border:1px solid var(--line);
+    border-radius:.5rem;padding:.6rem .65rem}
+  #feed::-webkit-scrollbar{width:8px}
+  #feed::-webkit-scrollbar-thumb{background:#2f362f;border-radius:4px}
+  .markers{position:absolute;inset:0;pointer-events:none;z-index:5}
+  .marker{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+    align-items:center;gap:3px}
+  .marker .dot{width:11px;height:11px;border-radius:50%;background:var(--ok);
+    border:2px solid #0a0c0a;box-shadow:0 0 9px rgba(111,175,104,.85)}
+  .marker .nm{font-size:.66rem;color:#fff;background:rgba(10,12,10,.8);padding:1px 5px;
+    border-radius:.3rem;white-space:nowrap}
+  .marker.pin .ic{font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
+  .marker.pin .nm{color:var(--gold)}
   .stamp{color:var(--muted);font-size:.72rem;margin-top:1rem}
   .sidefoot{color:var(--muted);font-size:.72rem;margin-top:.8rem;border-top:1px solid var(--line);padding-top:.8rem}
 
@@ -107,7 +120,7 @@
     <div class="grid" id="tiles"></div>
     <div class="online" id="online"></div>
     <div class="feed">
-      <h3>Events &amp; chat</h3>
+      <h3>Log</h3>
       <div id="feed"></div>
     </div>
     <p class="stamp" id="stamp"></p>
@@ -122,6 +135,7 @@
       <img id="mapBase" src="./data/map/map.png" alt="Valheim world map">
       <img id="mapFog" src="./data/map/fog.png" alt="explored areas">
     </div>
+    <div class="markers" id="markers"></div>
     <div class="mapctl">
       <button id="zoomIn"  title="Zoom in">+</button>
       <button id="zoomOut" title="Zoom out">−</button>
@@ -137,7 +151,28 @@ const stage = document.getElementById("stage");
 const inner = document.getElementById("mapinner");
 let scale = 1, tx = 0, ty = 0, fit = 1;
 
-function apply(){ inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
+function apply(){
+  inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  positionMarkers();
+}
+function positionMarkers(){
+  document.querySelectorAll("#markers .marker").forEach(el => {
+    el.style.left = (tx + (+el.dataset.px) * scale) + "px";
+    el.style.top  = (ty + (+el.dataset.py) * scale) + "px";
+  });
+}
+const PIN_ICON = {dot:"\u25CF", fire:"\uD83D\uDD25", mine:"\u26CF\uFE0F", house:"\uD83C\uDFE0", cave:"\uD83D\uDD73\uFE0F"};
+function buildMarkers(players, pinList){
+  const p = (players||[]).map(m =>
+    `<div class="marker" data-px="${m.px}" data-py="${m.py}">`
+    + `<span class="dot"></span><span class="nm">${esc(m.name)}</span></div>`);
+  const q = (pinList||[]).map(m =>
+    `<div class="marker pin" data-px="${m.px}" data-py="${m.py}" title="${esc(m.owner||"")}">`
+    + `<span class="ic">${PIN_ICON[m.type] || PIN_ICON.dot}</span>`
+    + (m.text ? `<span class="nm">${esc(m.text)}</span>` : "") + `</div>`);
+  document.getElementById("markers").innerHTML = p.concat(q).join("");
+  positionMarkers();
+}
 function clamp(v,a,b){ return Math.min(b,Math.max(a,v)); }
 
 function computeFit(){
@@ -256,7 +291,7 @@ try{
 }catch(e){ if(innerWidth < 760) setSide(true); }
 
 // ---------- status ----------
-let CONNECT = "", STATUS = {}, PLAYERS = {}, EXPLORED = null;
+let CONNECT = "", STATUS = {}, PLAYERS = {}, PINS = [], EXPLORED = null;
 function copyIp(){ if(CONNECT) navigator.clipboard?.writeText(CONNECT); }
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tile(k,v,sub){ return `<div class="tile"><div class="k">${k}</div><div class="v">${v}${sub?` <small>${sub}</small>`:""}</div></div>`; }
@@ -283,8 +318,12 @@ function renderTiles(){
     tile("Explored", EXPLORED==null ? "—" : (EXPLORED*100).toFixed(1), EXPLORED==null?"":"%"),
   ].join("");
   const names = (PLAYERS && PLAYERS.names) || [];
-  document.getElementById("online").innerHTML =
-    names.length ? `<b>Online:</b> ${names.map(esc).join(", ")}` : "";
+  const marks = (PLAYERS && PLAYERS.markers) || [];
+  let line = names.length ? `<b>Online:</b> ${names.map(esc).join(", ")}` : "";
+  if(names.length && !marks.length)
+    line += `<br><span style="font-size:.7rem">not shown on map — enable “visible to other players” on the in-game map (M)</span>`;
+  document.getElementById("online").innerHTML = line;
+  buildMarkers(marks, PINS);
 }
 function renderFeed(data){
   const msgs = (data && data.messages) || [];
@@ -313,6 +352,8 @@ async function load(){
     document.getElementById("stamp").textContent = "status unavailable";
   }
   PLAYERS = (await getJSON("./data/players.json")) || {};
+  const pj = await getJSON("./data/pins.json");
+  PINS = (pj && pj.pins) || [];
   renderTiles();
   renderFeed(await getJSON("./data/messages.json"));
 }
