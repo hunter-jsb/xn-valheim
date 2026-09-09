@@ -1,32 +1,29 @@
 #!/usr/bin/env python3
-"""Push Valheim server health to Statuspage.io (like xn-mc's bot).
+"""Push Valheim server health to Statuspage.io and the Pages status pill.
 
-Health signal: the server writes BepInEx/LogOutput.log continuously while running,
-so a recent mtime means it's up. The WebMap component tracks the same process.
+Health = an HTTP GET of the live WebMap endpoint (the mod's own server). A 200
+means the game server + mod are up. No SFTP needed for the check.
 
-Env: STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID, IB_SFTP_HOST/PORT/USER/PASS,
-     STATUSPAGE_SERVER_COMPONENT_ID, STATUSPAGE_WEBMAP_COMPONENT_ID.
+Env: STATUSPAGE_API_KEY, STATUSPAGE_PAGE_ID,
+     STATUSPAGE_SERVER_COMPONENT_ID, STATUSPAGE_WEBMAP_COMPONENT_ID,
+     WEBMAP_URL (default http://170.23.227.3:27021).
 """
 import json
 import os
-import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-import paramiko
-
 API = "https://api.statuspage.io/v1"
-LOG = "steamcmd/valheim/BepInEx/LogOutput.log"
-FOG = "steamcmd/valheim/BepInEx/plugins/WebMap/map_data/Mothership/fog.png"
-FRESH = 1800  # seconds; idle Valheim servers log infrequently
+WEBMAP_URL = os.environ.get("WEBMAP_URL", "http://170.23.227.3:27021")
 
 
-def _mtime_age(sf, path):
+def _up():
     try:
-        return time.time() - sf.stat(path).st_mtime
-    except IOError:
-        return None
+        with urllib.request.urlopen(WEBMAP_URL, timeout=12) as r:
+            return 200 <= r.status < 300
+    except Exception:
+        return False
 
 
 def _set(component_id, status, key, page):
@@ -43,29 +40,24 @@ def _set(component_id, status, key, page):
 
 
 def main():
-    key = os.environ["STATUSPAGE_API_KEY"]
-    page = os.environ["STATUSPAGE_PAGE_ID"]
-    t = paramiko.Transport((os.environ["IB_SFTP_HOST"], int(os.environ.get("IB_SFTP_PORT", "22"))))
-    t.connect(username=os.environ["IB_SFTP_USER"], password=os.environ["IB_SFTP_PASS"])
-    sf = paramiko.SFTPClient.from_transport(t)
-    log_age = _mtime_age(sf, LOG)
-    up = log_age is not None and log_age < FRESH
-    t.close()
+    up = _up()
+    key = os.environ.get("STATUSPAGE_API_KEY")
+    page = os.environ.get("STATUSPAGE_PAGE_ID")
 
-    # keep the Pages status pill in sync with the same health signal
     data_dir = Path(__file__).resolve().parent.parent / "docs" / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "status.json").write_text(json.dumps({
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "game": "Valheim", "world": "Mothership",
-        "ip": os.environ.get("IB_SFTP_HOST"), "port": 27020,
-        "online": bool(up), "source": "log-freshness",
+        "ip": "170.23.227.3", "port": 27020,
+        "online": bool(up), "webmap_url": WEBMAP_URL, "source": "webmap-http",
     }, indent=2) + "\n")
 
     status = "operational" if up else "major_outage"
-    _set(os.environ.get("STATUSPAGE_SERVER_COMPONENT_ID"), status, key, page)
-    _set(os.environ.get("STATUSPAGE_WEBMAP_COMPONENT_ID"), status, key, page)
-    print("server up:", up, "(log age %ss)" % (round(log_age) if log_age is not None else "n/a"))
+    if key and page:
+        _set(os.environ.get("STATUSPAGE_SERVER_COMPONENT_ID"), status, key, page)
+        _set(os.environ.get("STATUSPAGE_WEBMAP_COMPONENT_ID"), status, key, page)
+    print("server up:", up, "via", WEBMAP_URL)
 
 
 if __name__ == "__main__":

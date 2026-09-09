@@ -1,9 +1,10 @@
 {
-  "checked_at": "2026-09-09T19:08:21+00:00",
+  "checked_at": "2026-09-09T19:20:48+00:00",
   "game": "Valheim",
   "world": "Mothership",
   "ip": "170.23.227.3",
   "port": 27020,
   "online": true,
-  "source": "log-freshness"
+  "webmap_url": "http://170.23.227.3:27021",
+  "source": "webmap-http"
 }
