@@ -1,39 +1,31 @@
-name: refresh
+name: statuspage
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch: {}
 
 concurrency:
-  group: refresh
+  group: statuspage
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  refresh:
+  push:
     runs-on: ubuntu-latest
     if: ${{ vars.REFRESH_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: Pull map + push health (all over HTTP — no SFTP)
+      # The page no longer needs this job at all -- it reads the server live
+      # through the Worker. This only keeps the Statuspage components honest.
+      - name: Push health to Statuspage
         env:
           WEBMAP_URL: ${{ vars.WEBMAP_URL || 'http://170.23.227.3:27021' }}
           STATUSPAGE_API_KEY: ${{ secrets.STATUSPAGE_API_KEY }}
           STATUSPAGE_PAGE_ID: ${{ secrets.STATUSPAGE_PAGE_ID }}
           STATUSPAGE_SERVER_COMPONENT_ID: ${{ secrets.STATUSPAGE_SERVER_COMPONENT_ID }}
           STATUSPAGE_WEBMAP_COMPONENT_ID: ${{ secrets.STATUSPAGE_WEBMAP_COMPONENT_ID }}
-        run: |
-          uv run scripts/pull_map.py || true
-          uv run --with websocket-client scripts/pull_live.py || true
-          uv run scripts/statuspage_push.py
-      - name: Commit refreshed data
-        run: |
-          git config user.name  "xn-valheim-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add docs/data
-          git diff --cached --quiet || git commit -m "chore: refresh map + status [skip ci]"
-          git push
+        run: uv run scripts/statuspage_push.py

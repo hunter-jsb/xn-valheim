@@ -150,8 +150,8 @@
 
   <div class="stage" id="stage">
     <div class="mapinner" id="mapinner">
-      <img id="mapBase" src="./data/map/map.png" alt="Valheim world map">
-      <img id="mapFog" src="./data/map/fog.png" alt="explored areas">
+      <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
+      <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
     <div class="markers" id="markers"></div>
     <div class="mapctl">
@@ -344,8 +344,14 @@ document.getElementById("helpClose").addEventListener("click", () => showHelp(fa
 helpEl.addEventListener("click", e => { if(e.target === helpEl) showHelp(false); });
 addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 
-// ---------- status ----------
-let CONNECT = "", STATUS = {}, PLAYERS = {}, PINS = [], EXPLORED = null;
+// ---------- live data (straight from the server via the Worker) ----------
+// No committed snapshots: the page reads the game server through a Cloudflare
+// Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
+// forgotten tab costs nothing.
+const API = "https://valheim-proxy.hunterjsb.workers.dev";
+let CONNECT = "170.23.227.3:27020", PLAYERS = {}, PINS = [], EXPLORED = null;
+let GEOM = {pixel: 12, size: 2048};
+
 function copyIp(){ if(CONNECT) navigator.clipboard?.writeText(CONNECT); }
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tile(k,v,sub){ return `<div class="tile"><div class="k">${k}</div><div class="v">${v}${sub?` <small>${sub}</small>`:""}</div></div>`; }
@@ -355,81 +361,101 @@ function setPill(online){
   t.textContent = online===true?"Online":online===false?"Offline":"Unknown";
 }
 function ago(iso){
-  const d = (Date.now() - new Date(iso).getTime())/1000;
+  const d=(Date.now()-new Date(iso).getTime())/1000;
   if(!isFinite(d)) return "";
-  if(d < 90) return "just now";
-  if(d < 3600) return Math.round(d/60)+"m ago";
-  if(d < 86400) return Math.round(d/3600)+"h ago";
+  if(d<90) return "just now";
+  if(d<3600) return Math.round(d/60)+"m ago";
+  if(d<86400) return Math.round(d/3600)+"h ago";
   return Math.round(d/86400)+"d ago";
 }
-function renderTiles(){
-  const s = STATUS;
-  const count = (PLAYERS && PLAYERS.count != null) ? PLAYERS.count : "—";
-  document.getElementById("tiles").innerHTML = [
-    tile("Players", count, s.max_players?`/ ${s.max_players}`:""),
-    tile("World", esc(s.world||"—")),
-    tile("Version", esc(s.version||"1.0")),
-    tile("Explored", EXPLORED==null ? "—" : (EXPLORED*100).toFixed(1), EXPLORED==null?"":"%"),
-  ].join("");
-  const names = (PLAYERS && PLAYERS.names) || [];
-  const marks = (PLAYERS && PLAYERS.markers) || [];
-  let line = names.length ? `<b>Online:</b> ${names.map(esc).join(", ")}` : "";
-  if(names.length && !marks.length)
-    line += `<br><span style="font-size:.7rem">not shown on map — enable “visible to other players” on the in-game map (M)</span>`;
-  document.getElementById("online").innerHTML = line;
-  buildMarkers(marks, PINS);
+async function api(path){
+  const r = await fetch(API+path, {cache:"no-store"});
+  if(!r.ok) throw new Error(path+" "+r.status);
+  return r;
 }
-function renderFeed(data){
-  const msgs = (data && data.messages) || [];
-  const el = document.getElementById("feed");
-  if(!msgs.length){ el.innerHTML = '<div class="msg sys">nothing yet</div>'; return; }
-  el.innerHTML = msgs.slice().reverse().map(m => {
-    const sys = !m.name || m.name === "Server";
+// world -> image pixels, the same transform the mod's own UI uses
+function toPx(x,z){ return {px: x/GEOM.pixel + GEOM.size/2, py: GEOM.size/2 - z/GEOM.pixel}; }
+
+function renderTiles(){
+  const count = (PLAYERS && PLAYERS.count != null) ? PLAYERS.count : "\u2014";
+  document.getElementById("tiles").innerHTML = [
+    tile("Players", count),
+    tile("World", esc(GEOM.world || "Mothership")),
+    tile("Version", "1.0"),
+    tile("Explored", EXPLORED==null ? "\u2014" : (EXPLORED*100).toFixed(1), EXPLORED==null?"":"%"),
+  ].join("");
+  const list = (PLAYERS && PLAYERS.players) || [];
+  const hiddenCount = list.filter(p=>p.hidden).length;
+  let line = list.length ? `<b>Online:</b> ${list.map(p=>esc(p.name)).join(", ")}` : "";
+  if(list.length && hiddenCount === list.length)
+    line += `<br><span style="font-size:.7rem">not shown on map \u2014 enable \u201cvisible to other players\u201d on the in-game map (M)</span>`;
+  document.getElementById("online").innerHTML = line;
+  buildMarkers(list.filter(p=>p.x!=null && p.z!=null).map(p=>({name:p.name, ...toPx(p.x,p.z)})), PINS);
+}
+function renderFeed(msgs){
+  const el=document.getElementById("feed");
+  if(!msgs || !msgs.length){ el.innerHTML='<div class="msg sys">nothing yet</div>'; return; }
+  el.innerHTML = msgs.slice().reverse().map(m=>{
+    const sys = !m.name || m.name==="Server";
     const when = m.ts ? `<span class="t">${esc(ago(m.ts))}</span>` : "";
-    return sys
-      ? `<div class="msg sys">${esc(m.message||"")}${when}</div>`
-      : `<div class="msg"><span class="who">${esc(m.name)}</span>: ${esc(m.message||"")}${when}</div>`;
+    return sys ? `<div class="msg sys">${esc(m.message||"")}${when}</div>`
+               : `<div class="msg"><span class="who">${esc(m.name)}</span>: ${esc(m.message||"")}${when}</div>`;
   }).join("");
 }
-async function getJSON(u){ try{ return await (await fetch(u+"?"+Date.now())).json(); }catch(e){ return null; } }
-async function load(){
-  const s = await getJSON("./data/status.json");
-  if(s){
-    STATUS = s;
-    CONNECT = s.ip ? `${s.ip}:${s.port||""}`.replace(/:$/,"") : "—";
-    document.getElementById("ipcode").textContent = CONNECT;
-    setPill(s.online);
-    if(s.webmap_url){
-      document.getElementById("navLive").href = s.webmap_url;
-      const hl = document.getElementById("helpLive"); if(hl) hl.href = s.webmap_url;
-    }
-    const when = s.checked_at ? new Date(s.checked_at).toLocaleString() : "—";
-    document.getElementById("stamp").textContent = `checked ${when}`;
-  } else {
-    document.getElementById("stamp").textContent = "status unavailable";
+
+async function tickFast(){                 // players + chat: the things that move
+  try{
+    const [pj, mj] = await Promise.all([
+      api("/players").then(r=>r.json()),
+      api("/messages").then(r=>r.json()).catch(()=>null),
+    ]);
+    PLAYERS = pj || {};
+    setPill(true);
+    document.getElementById("stamp").textContent = "live \u00b7 updated " + new Date().toLocaleTimeString();
+    renderTiles();
+    if(mj) renderFeed(mj);
+  }catch(e){
+    setPill(false);
+    document.getElementById("stamp").textContent = "server unreachable";
   }
-  PLAYERS = (await getJSON("./data/players.json")) || {};
-  const pj = await getJSON("./data/pins.json");
-  PINS = (pj && pj.pins) || [];
-  renderTiles();
-  renderFeed(await getJSON("./data/messages.json"));
+}
+async function tickSlow(){                 // pins + fog: change rarely
+  try{
+    const csv = await api("/pins").then(r=>r.text());
+    PINS = csv.split("\n").filter(Boolean).map(line=>{
+      const f=line.split(",");
+      if(f.length<6) return null;
+      const x=parseFloat(f[4]), z=parseFloat(f[5]);
+      if(!isFinite(x)||!isFinite(z)) return null;
+      return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
+    }).filter(Boolean);
+    renderTiles();
+  }catch(e){}
+  const fog=document.getElementById("mapFog");
+  const probe=new Image();
+  probe.crossOrigin="anonymous";
+  probe.onload=()=>{ fog.src=probe.src; setTimeout(()=>fitExplored(false),60); };
+  probe.src = API+"/fog?"+Date.now();
+}
+
+async function boot(){
+  document.getElementById("ipcode").textContent = CONNECT;
+  document.getElementById("mapBase").src = API+"/map";
+  try{
+    const c = await api("/config").then(r=>r.json());
+    GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
+  }catch(e){}
+  await tickFast();
+  await tickSlow();
+  // visibility-gated so a background tab makes no requests
+  setInterval(()=>{ if(document.visibilityState==="visible") tickFast(); }, 5000);
+  setInterval(()=>{ if(document.visibilityState==="visible") tickSlow(); }, 30000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickFast(); });
 }
 
 computeFit(); fitView();
-const fogImg = document.getElementById("mapFog");
-if(fogImg.complete) fitExplored(); else fogImg.addEventListener("load", fitExplored, {once:true});
-addEventListener("load", () => setTimeout(fitExplored, 30));
-load();
-
-// Keep an open tab current. The underlying data is only rewritten when the
-// scheduled job runs, so poll gently and never move the user's view.
-function refreshFog(){
-  const img = document.getElementById("mapFog");
-  const probe = new Image();
-  probe.onload = () => { img.src = probe.src; setTimeout(() => fitExplored(false), 60); };
-  probe.src = "./data/map/fog.png?" + Date.now();
-}
-setInterval(() => { load(); refreshFog(); }, 60000);
+document.getElementById("mapFog").addEventListener("load", () => fitExplored(true), {once:true});
+boot();
 </script>
 </body>
 </html>

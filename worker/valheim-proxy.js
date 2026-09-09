@@ -1,0 +1,69 @@
+// Cloudflare Worker: HTTPS + CORS front for the Valheim WebMap mod.
+//
+// The site is HTTPS and the mod speaks plain HTTP on a bare IP, so a browser
+// can't fetch it directly (mixed content, and the mod sends no CORS header).
+// A Worker can: it fetches server-side, where neither rule applies, and returns
+// the bytes with a CORS header. That removes the need to poll-and-commit
+// snapshots, so the page can read live data every few seconds.
+
+const UPSTREAM = "http://170-23-227-3.sslip.io:27021"; // Workers refuse fetch() to a bare IP (error 1003)
+const ALLOWED_ORIGINS = new Set([
+  "https://hunter-jsb.github.io",
+  "http://localhost:8899", // local preview
+]);
+
+// Only these are proxied. Everything else 404s, so this can't be used as an
+// open relay to arbitrary hosts or paths.
+const ROUTES = {
+  "/messages": { ttl: 0 },
+  "/players":  { ttl: 0 },
+  "/pins":     { ttl: 0 },
+  "/config":   { ttl: 60 },
+  "/fog":      { ttl: 5 },
+  "/map":      { ttl: 86400 }, // the base world render never changes
+};
+
+// Wildcard rather than echoing Origin: these responses are edge-cached, and a
+// cached per-origin header would be served to the wrong origin. The data is
+// public regardless, and the path allowlist is what stops this being a relay.
+function cors() {
+  const h = new Headers();
+  h.set("Access-Control-Allow-Origin", "*");
+  h.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  return h;
+}
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+        if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
+    if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+
+    if (url.pathname === "/" || url.pathname === "/health") {
+      return new Response(JSON.stringify({ ok: true, upstream: UPSTREAM, routes: Object.keys(ROUTES) }),
+        { headers: { ...Object.fromEntries(cors()), "content-type": "application/json" } });
+    }
+
+    const route = ROUTES[url.pathname];
+    if (!route) return new Response("not found", { status: 404, headers: cors() });
+
+    let upstream;
+    try {
+      upstream = await fetch(UPSTREAM + url.pathname, {
+        method: "GET",
+        cf: route.ttl ? { cacheTtl: route.ttl, cacheEverything: true } : { cacheTtl: 0 },
+      });
+    } catch (e) {
+      // The game server being down must not look like the Worker being broken.
+      return new Response(JSON.stringify({ error: "upstream unreachable" }),
+        { status: 502, headers: { ...Object.fromEntries(cors()), "content-type": "application/json" } });
+    }
+
+    const headers = cors();
+    const ct = upstream.headers.get("content-type");
+    // the mod misspells this one as "applicaion/json"
+    headers.set("content-type", url.pathname === "/map" ? "image/png" : (ct && !ct.startsWith("applicaion") ? ct : "application/json"));
+    headers.set("cache-control", route.ttl ? `public, max-age=${route.ttl}` : "no-store");
+    return new Response(upstream.body, { status: upstream.status, headers });
+  },
+};
