@@ -1,0 +1,36 @@
+name: collect-metrics
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes
+  workflow_dispatch: {}
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Collect status
+        env:
+          # Optional: set these repo secrets for accurate panel telemetry
+          # (cpu/ram/players/status). Without them the collector falls back to
+          # a credential-free Steam A2S probe. IB has no API tokens — the only
+          # credential is the account password, so weigh that before adding it.
+          IB_EMAIL: ${{ secrets.IB_EMAIL }}
+          IB_PASSWORD: ${{ secrets.IB_PASSWORD }}
+        run: uv run --project scripts scripts/collect.py --game Valheim
+      - name: Commit data
+        run: |
+          git config user.name  "xn-valheim-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/status.json docs/data/history.json
+          git diff --cached --quiet || git commit -m "chore: metrics snapshot [skip ci]"
+          git push

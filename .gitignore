@@ -1,0 +1,27 @@
+# secrets / local creds — never commit
+.env
+*.cookie
+ib_cookie.txt
+secrets/
+sftp-key*
+*.pem
+
+# pulled world saves (can be large; live game data)
+world/
+*.db
+*.fwl
+*.fch
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.python-version
+
+# node
+node_modules/
+dist/
+
+# pulumi runtime
+pulumi/sdks/
+pulumi/.outputs/

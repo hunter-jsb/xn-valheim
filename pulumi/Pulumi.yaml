@@ -1,0 +1,11 @@
+name: xn-valheim
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
+description: Valheim server state-as-code on Indifferent Broccoli (files, roles).
+config:
+  xn-valheim:linuxUsername:
+    description: The IB server key (fileBrowser linuxUsername) for the Valheim server.
+    default: 4RM8tBOucr5l
