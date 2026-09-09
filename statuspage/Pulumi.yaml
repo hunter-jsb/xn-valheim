@@ -1,0 +1,9 @@
+name: xn-valheim-statuspage
+description: Xandaris Valheim Statuspage.io components
+runtime: go
+packages:
+  statuspage:
+    source: pulumi/pulumi/terraform-provider
+    version: 0.3.0
+    parameters:
+      - yannh/statuspage

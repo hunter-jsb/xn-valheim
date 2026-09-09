@@ -25,3 +25,6 @@ dist/
 # pulumi runtime
 pulumi/sdks/
 pulumi/.outputs/
+
+# pulumi local backend state (local only)
+statuspage/state/
