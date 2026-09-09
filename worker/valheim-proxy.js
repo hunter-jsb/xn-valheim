@@ -20,7 +20,9 @@ const ROUTES = {
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
   "/fog":      { ttl: 5 },
-  "/map":      { ttl: 86400 }, // the base world render never changes
+  // The unfogged world render. Deliberately not at /map: the honour system is
+  // the actual policy, this just avoids leaving a one-click URL lying around.
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map", noNavigate: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -47,9 +49,15 @@ export default {
     const route = ROUTES[url.pathname];
     if (!route) return new Response("not found", { status: 404, headers: cors() });
 
+    // Pasting this into an address bar is a document request; the page's <img>
+    // is not. Refuse the former so the whole map isn't one click from curiosity.
+    if (route.noNavigate && request.headers.get("Sec-Fetch-Dest") === "document") {
+      return new Response("not found", { status: 404, headers: cors() });
+    }
+
     let upstream;
     try {
-      upstream = await fetch(UPSTREAM + url.pathname, {
+      upstream = await fetch(UPSTREAM + (route.upstream || url.pathname), {
         method: "GET",
         cf: route.ttl ? { cacheTtl: route.ttl, cacheEverything: true } : { cacheTtl: 0 },
       });
@@ -62,7 +70,7 @@ export default {
     const headers = cors();
     const ct = upstream.headers.get("content-type");
     // the mod misspells this one as "applicaion/json"
-    headers.set("content-type", url.pathname === "/map" ? "image/png" : (ct && !ct.startsWith("applicaion") ? ct : "application/json"));
+    headers.set("content-type", route.upstream === "/map" ? "image/png" : (ct && !ct.startsWith("applicaion") ? ct : "application/json"));
     headers.set("cache-control", route.ttl ? `public, max-age=${route.ttl}` : "no-store");
     return new Response(upstream.body, { status: upstream.status, headers });
   },

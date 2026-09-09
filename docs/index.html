@@ -441,7 +441,7 @@ async function tickSlow(){                 // pins + fog: change rarely
 
 async function boot(){
   document.getElementById("ipcode").textContent = CONNECT;
-  document.getElementById("mapBase").src = API+"/map";
+  document.getElementById("mapBase").src = API+"/base-6f3a9c2e";
   try{
     const c = await api("/config").then(r=>r.json());
     GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
