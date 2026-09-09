@@ -81,8 +81,7 @@
   <section class="card">
     <h2>🗺️ World Map — Mothership</h2>
     <div class="maptools">
-      <label><input type="checkbox" id="fogToggle" checked> Fog of war (explored only)</label>
-      <a id="mapFull" href="./data/map/map.png" target="_blank" rel="noopener">Open full size ↗</a>
+      <span class="pill">Fog of war — always on</span>
     </div>
     <div class="mapwrap" id="mapwrap">
       <img id="mapBase" src="./data/map/map.png" alt="Valheim world map">
@@ -120,6 +119,7 @@ async function load(){
   CONNECT = s.ip ? `${s.ip}:${s.port||s.game_port||""}`.replace(/:$/,"") : (s.linuxUsername||"—");
   document.getElementById("ipcode").textContent = CONNECT || "—";
   setPill(s.online);
+  if(s.webmap_url){ const ml=document.getElementById("mapLive"); if(ml) ml.href=s.webmap_url; }
 
   const tiles=[
     tile("Players", (s.players??"—")+"", s.max_players?`/ ${s.max_players}`:""),
@@ -135,9 +135,6 @@ async function load(){
 
 }
 
-
-const fogT=document.getElementById("fogToggle");
-if(fogT){ fogT.addEventListener("change",()=>{ document.getElementById("mapFog").hidden=!fogT.checked; }); }
 
 load();
 </script>
