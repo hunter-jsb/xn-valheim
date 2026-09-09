@@ -2,7 +2,7 @@ name: refresh
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch: {}
 
 concurrency:
@@ -28,6 +28,7 @@ jobs:
           STATUSPAGE_WEBMAP_COMPONENT_ID: ${{ secrets.STATUSPAGE_WEBMAP_COMPONENT_ID }}
         run: |
           uv run scripts/pull_map.py || true
+          uv run --with websocket-client scripts/pull_live.py || true
           uv run scripts/statuspage_push.py
       - name: Commit refreshed data
         run: |
