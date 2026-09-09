@@ -74,6 +74,7 @@
     border:2px solid #0a0c0a;box-shadow:0 0 9px rgba(111,175,104,.85)}
   .marker .nm{font-size:.66rem;color:#fff;background:rgba(10,12,10,.8);padding:1px 5px;
     border-radius:.3rem;white-space:nowrap}
+  .mapinner.ready{visibility:visible}
   .marker.pin .ic{font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.pin .nm{color:var(--gold)}
   .stamp{color:var(--muted);font-size:.72rem;margin-top:1rem}
@@ -82,7 +83,7 @@
   /* ---------- map stage ---------- */
   .stage{flex:1;position:relative;overflow:hidden;background:#0a0c0a;cursor:grab;touch-action:none}
   .stage.dragging{cursor:grabbing}
-  .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;
+  .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
     background:#000;isolation:isolate;will-change:transform}
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
   #mapFog{mix-blend-mode:multiply}
@@ -454,7 +455,20 @@ async function boot(){
 }
 
 computeFit(); fitView();
-document.getElementById("mapFog").addEventListener("load", () => fitExplored(true), {once:true});
+// The base render is the whole world; it must never be visible without the fog
+// mask on top of it. Reveal only when both layers have decoded.
+let _layers = 0;
+function layerReady(){
+  if(++_layers >= 2){
+    inner.classList.add("ready");
+    fitExplored(true);
+  }
+}
+["mapBase","mapFog"].forEach(id => {
+  const el = document.getElementById(id);
+  if(el.complete && el.naturalWidth) layerReady();
+  else el.addEventListener("load", layerReady, {once:true});
+});
 boot();
 </script>
 </body>
