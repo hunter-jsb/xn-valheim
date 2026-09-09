@@ -1,10 +1,9 @@
 {
-  "checked_at": "2026-09-09T16:43:30+00:00",
+  "checked_at": "2026-09-09T19:06:57+00:00",
   "game": "Valheim",
-  "online": true,
   "world": "Mothership",
-  "port": 27020,
-  "source": "manual (deploy)",
   "ip": "170.23.227.3",
-  "linuxUsername": "4RM8tBOucr5l"
+  "port": 27020,
+  "online": true,
+  "source": "log-freshness"
 }

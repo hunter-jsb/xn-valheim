@@ -1,0 +1,42 @@
+name: refresh
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # only runs once the SFTP secret is present; a no-secret run is skipped cleanly
+    if: ${{ vars.REFRESH_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Pull map + push health
+        env:
+          IB_SFTP_HOST: ${{ secrets.IB_SFTP_HOST }}
+          IB_SFTP_PORT: ${{ secrets.IB_SFTP_PORT }}
+          IB_SFTP_USER: ${{ secrets.IB_SFTP_USER }}
+          IB_SFTP_PASS: ${{ secrets.IB_SFTP_PASS }}
+          STATUSPAGE_API_KEY: ${{ secrets.STATUSPAGE_API_KEY }}
+          STATUSPAGE_PAGE_ID: ${{ secrets.STATUSPAGE_PAGE_ID }}
+          STATUSPAGE_SERVER_COMPONENT_ID: ${{ secrets.STATUSPAGE_SERVER_COMPONENT_ID }}
+          STATUSPAGE_WEBMAP_COMPONENT_ID: ${{ secrets.STATUSPAGE_WEBMAP_COMPONENT_ID }}
+        run: |
+          uv run --with paramiko scripts/pull_map.py || true
+          uv run --with paramiko scripts/statuspage_push.py
+      - name: Commit refreshed data
+        run: |
+          git config user.name  "xn-valheim-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data
+          git diff --cached --quiet || git commit -m "chore: refresh map + status [skip ci]"
+          git push
