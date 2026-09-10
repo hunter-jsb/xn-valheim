@@ -282,6 +282,9 @@ stage.addEventListener("wheel", e => {
 const pts = new Map();
 let last = null, pinch = null;
 stage.addEventListener("pointerdown", e => {
+  // Don't start a drag on the controls: capturing the pointer here retargets
+  // the pointerup to the stage, so the button never receives its click.
+  if (e.target.closest && e.target.closest(".mapctl")) return;
   stage.setPointerCapture(e.pointerId);
   pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if(pts.size === 1){ last = {x:e.clientX, y:e.clientY}; stage.classList.add("dragging"); }
