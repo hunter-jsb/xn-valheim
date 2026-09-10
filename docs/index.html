@@ -208,10 +208,15 @@ function apply(){
 // a base is ~10 map pixels across, so zoomed out it needs a halo to be a mark at all;
 // up close the halo would swallow it, and a dark rim is enough to lift it off the terrain
 function structGlow(){
-  const st = document.getElementById("mapStruct"); if (!st) return;
-  st.style.filter = scale < 4
-    ? "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))"
-    : "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))";
+  const near = scale >= 4;
+  const st = document.getElementById("mapStruct");
+  if (st) st.style.filter = near
+    ? "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))"
+    : "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))";
+  const fr = document.getElementById("mapForest");
+  if (fr) fr.style.filter = near
+    ? "drop-shadow(0 0 1px rgba(0,0,0,.9))"
+    : "drop-shadow(0 0 3px rgba(236,228,205,.9)) drop-shadow(0 0 7px rgba(210,196,160,.5))";
 }
 function positionMarkers(){
   document.querySelectorAll("#markers .marker").forEach(el => {
