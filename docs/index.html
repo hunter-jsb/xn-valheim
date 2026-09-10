@@ -35,11 +35,19 @@
   .sidebar{width:var(--side);flex:0 0 var(--side);background:#12150f;border-right:1px solid var(--line);
     overflow-y:auto;padding:1rem}
   .statusrow{display:flex;align-items:center;gap:.45rem;flex-wrap:nowrap;margin-bottom:1rem}
-  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.28rem .55rem;border-radius:999px;
-    font-weight:600;font-size:.76rem;border:1px solid var(--line);flex:0 0 auto;white-space:nowrap}
-  .pill .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--unknown)}
-  .pill.online{color:var(--ok);border-color:#33502f}.pill.online .dot{background:var(--ok);box-shadow:0 0 9px var(--ok)}
-  .pill.offline{color:var(--off);border-color:#4a2a2a}.pill.offline .dot{background:var(--off)}
+  .status{display:block;width:100%;background:var(--card);border:1px solid var(--line);
+    border-radius:.5rem;padding:.5rem .6rem;color:var(--ink);text-decoration:none}
+  .status:hover{border-color:var(--gold);text-decoration:none}
+  .status .shead{display:flex;align-items:center;gap:.4rem;font-size:.78rem}
+  .status .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--unknown);flex:0 0 auto}
+  .status .srows{display:grid;gap:.2rem;margin-top:.4rem;font-size:.72rem;color:var(--muted)}
+  .status .srows span{display:flex;align-items:center;gap:.4rem}
+  .status .ok{color:var(--ok)}.status .ok .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .status.ok .shead .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .status.bad .shead{color:var(--off)}.status.bad .shead .dot{background:var(--off)}
+  .status.warn .shead{color:var(--gold)}.status.warn .shead .dot{background:var(--gold)}
+  .status .bad{color:var(--off)}.status .bad .dot{background:var(--off)}
+  .status .warn{color:var(--gold)}.status .warn .dot{background:var(--gold)}
   .grid{display:grid;gap:.6rem;grid-template-columns:1fr 1fr}
   .tile{background:var(--card);border:1px solid var(--line);border-radius:.6rem;padding:.7rem .8rem}
   .tile .k{color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em}
@@ -129,7 +137,10 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <div class="statusrow">
-      <span id="pill" class="pill"><span class="dot"></span><span id="pilltext">…</span></span>
+      <a class="status" id="status" href="https://xnmc.statuspage.io" target="_blank" rel="noopener">
+        <span class="shead"><span class="dot" id="sdot"></span><b id="stext">checking…</b></span>
+        <span class="srows" id="srows"></span>
+      </a>
     </div>
     <div class="grid" id="tiles"></div>
     <div class="online" id="online"></div>
@@ -374,10 +385,40 @@ let GEOM = {pixel: 12, size: 2048};
 
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function tile(k,v,sub){ return `<div class="tile"><div class="k">${k}</div><div class="v">${v}${sub?` <small>${sub}</small>`:""}</div></div>`; }
-function setPill(online){
-  const p=document.getElementById("pill"), t=document.getElementById("pilltext");
-  p.className="pill "+(online===true?"online":online===false?"offline":"");
-  t.textContent = online===true?"Online":online===false?"Offline":"Unknown";
+// Statuspage summary, rendered in the site's own styling rather than their
+// floating widget. Their v2 API is CORS-open, so no proxy is involved.
+const STATUS_JSON = "https://xnmc.statuspage.io/api/v2/summary.json";
+let LIVE_UP = null;                        // our own 5s probe: fresher than the 15min cron
+const CLS = {operational:"ok", degraded_performance:"warn", partial_outage:"warn",
+             major_outage:"bad", under_maintenance:"warn"};
+
+function setPill(online){ LIVE_UP = online; renderStatus(); }
+
+let SUMMARY = null;
+async function tickStatus(){
+  try{ SUMMARY = await fetch(STATUS_JSON, {cache:"no-store"}).then(r=>r.json()); }
+  catch(e){ SUMMARY = null; }
+  renderStatus();
+}
+function renderStatus(){
+  const head=document.getElementById("stext"), rows=document.getElementById("srows");
+  const box=document.getElementById("status");
+  if(!SUMMARY){
+    box.className = "status " + (LIVE_UP===true?"ok":LIVE_UP===false?"bad":"");
+    head.textContent = LIVE_UP===true?"Online":LIVE_UP===false?"Offline":"Status unavailable";
+    rows.innerHTML = ""; return;
+  }
+  const comps = (SUMMARY.components||[]).filter(c=>!c.group);
+  let overall = SUMMARY.status?.description || "";
+  let cls = SUMMARY.status?.indicator === "none" ? "ok" : "warn";
+  // the cron behind Statuspage runs every 15 minutes, so a live failure wins
+  if(LIVE_UP === false){ cls="bad"; overall="Server unreachable"; }
+  box.className = "status " + cls;
+  head.textContent = overall;
+  rows.innerHTML = comps.map(c=>{
+    const live = (LIVE_UP===false && /server/i.test(c.name)) ? "major_outage" : c.status;
+    return `<span class="${CLS[live]||""}"><span class="dot"></span>${esc(c.name)}</span>`;
+  }).join("");
 }
 function ago(iso){
   const d=(Date.now()-new Date(iso).getTime())/1000;
@@ -490,6 +531,8 @@ async function boot(){
   // visibility-gated so a background tab makes no requests
   setInterval(()=>{ if(document.visibilityState==="visible") tickFast(); }, 5000);
   setInterval(()=>{ if(document.visibilityState==="visible") tickSlow(); }, 30000);
+  tickStatus();
+  setInterval(()=>{ if(document.visibilityState==="visible") tickStatus(); }, 60000);
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickFast(); });
 }
 
