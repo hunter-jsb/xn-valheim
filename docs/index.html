@@ -152,6 +152,7 @@
   <div class="stage" id="stage">
     <div class="mapinner" id="mapinner">
       <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
+      <img id="mapForest" crossorigin="anonymous" alt="forest cover and logging">
       <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
@@ -465,6 +466,12 @@ async function tickSlow(){                 // pins + fog: change rarely
   sProbe.onload=()=>{ st.src=sProbe.src; };
   sProbe.src = API+"/structures?"+Date.now();
 
+  const fr=document.getElementById("mapForest");
+  const fProbe=new Image();
+  fProbe.crossOrigin="anonymous";
+  fProbe.onload=()=>{ fr.src=fProbe.src; fr.style.display=""; };
+  fProbe.src = API+"/forest?"+Date.now();
+
   const fog=document.getElementById("mapFog");
   const probe=new Image();
   probe.crossOrigin="anonymous";
@@ -480,6 +487,11 @@ async function boot(){
   structImg.onload  = () => { structImg.style.display = ""; };
   structImg.onerror = () => { structImg.style.display = "none"; };
   structImg.src = API+"/structures";
+  const forestImg = document.getElementById("mapForest");
+  forestImg.style.display = "none";
+  forestImg.onload  = () => { forestImg.style.display = ""; };
+  forestImg.onerror = () => { forestImg.style.display = "none"; };
+  forestImg.src = API+"/forest";
   try{
     const c = await api("/config").then(r=>r.json());
     GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};

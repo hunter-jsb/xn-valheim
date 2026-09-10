@@ -20,6 +20,8 @@ const ROUTES = {
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
   "/fog":      { ttl: 5 },
+  "/forest": { ttl: 60 },
+  "/forest/stats": { ttl: 30 },
   "/structures": { ttl: 30 },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
