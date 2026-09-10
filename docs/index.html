@@ -152,6 +152,7 @@
   <div class="stage" id="stage">
     <div class="mapinner" id="mapinner">
       <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
+      <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
     <div class="markers" id="markers"></div>
@@ -159,6 +160,7 @@
       <button id="zoomIn"  title="Zoom in">+</button>
       <button id="zoomOut" title="Zoom out">−</button>
       <button id="zoomFit" title="Fit">⌂</button>
+      <button id="structBtn" title="Rescan structures">⟳</button>
       <button id="fsBtn"   title="Fullscreen">⛶</button>
     </div>
   </div>
@@ -320,6 +322,19 @@ function pinchState(){
 document.getElementById("zoomIn").onclick  = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1.35);
 document.getElementById("zoomOut").onclick = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1/1.35);
 document.getElementById("zoomFit").onclick = fitExplored;
+document.getElementById("structBtn").onclick = async (e) => {
+  const b = e.currentTarget;
+  b.disabled = true; b.textContent = "…";
+  try { await fetch(API+"/structures/refresh", {cache:"no-store"}); } catch(err){}
+  // the sweep runs on the server's own frames; give it a moment, then re-pull
+  setTimeout(() => {
+    const st=document.getElementById("mapStruct");
+    const p=new Image(); p.crossOrigin="anonymous";
+    p.onload=()=>{ st.src=p.src; b.disabled=false; b.textContent="⟳"; };
+    p.onerror=()=>{ b.disabled=false; b.textContent="⟳"; };
+    p.src = API+"/structures?"+Date.now();
+  }, 8000);
+}
 document.getElementById("fsBtn").onclick = () => {
   if(document.fullscreenElement) document.exitFullscreen();
   else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
@@ -435,6 +450,12 @@ async function tickSlow(){                 // pins + fog: change rarely
     }).filter(Boolean);
     renderTiles();
   }catch(e){}
+  const st=document.getElementById("mapStruct");
+  const sProbe=new Image();
+  sProbe.crossOrigin="anonymous";
+  sProbe.onload=()=>{ st.src=sProbe.src; };
+  sProbe.src = API+"/structures?"+Date.now();
+
   const fog=document.getElementById("mapFog");
   const probe=new Image();
   probe.crossOrigin="anonymous";
@@ -445,6 +466,11 @@ async function tickSlow(){                 // pins + fog: change rarely
 async function boot(){
   document.getElementById("ipcode").textContent = CONNECT;
   document.getElementById("mapBase").src = API+"/base-6f3a9c2e";
+  const structImg = document.getElementById("mapStruct");
+  structImg.style.display = "none";
+  structImg.onload  = () => { structImg.style.display = ""; };
+  structImg.onerror = () => { structImg.style.display = "none"; };
+  structImg.src = API+"/structures";
   try{
     const c = await api("/config").then(r=>r.json());
     GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
