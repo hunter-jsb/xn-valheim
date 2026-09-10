@@ -76,15 +76,16 @@
   .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
     background:#000;isolation:isolate;will-change:transform}
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
+  #mapForest{mix-blend-mode:multiply}
   #mapFog{mix-blend-mode:multiply}
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
   .mapctl{display:flex;flex-direction:column;gap:.35rem}
-  .legend{background:rgba(18,21,15,.9);border:1px solid var(--line);border-radius:.45rem;
-    padding:.5rem .6rem;font-size:.68rem;color:var(--muted);display:grid;gap:.3rem;
-    grid-template-columns:auto auto;align-items:center}
+  .legend{position:absolute;left:.7rem;bottom:.7rem;z-index:10;
+    background:rgba(18,21,15,.82);border:1px solid var(--line);border-radius:.45rem;
+    padding:.55rem .7rem;font-size:.72rem;color:var(--muted);display:grid;gap:.35rem .6rem;
+    grid-template-columns:auto 1fr;align-items:center}
   .legend .sw{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.7)}
   .legend .ic{width:13px;text-align:center;font-size:12px;line-height:1}
-  @media (max-width:640px){ .legend{display:none} }
   .mapctl button{width:36px;height:36px;border-radius:.45rem;border:1px solid var(--line);
     background:rgba(18,21,15,.9);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1}
   .mapctl button:hover{border-color:var(--gold);color:var(--gold)}
@@ -94,7 +95,7 @@
     align-items:center;justify-content:center;padding:1.25rem}
   .modal[hidden]{display:none}
   .modal:not([hidden]){display:flex}
-  .sheet{background:#141813;border:1px solid var(--line);border-radius:.8rem;max-width:520px;width:100%;
+  .sheet{background:#141813;border:1px solid var(--line);border-radius:.8rem;max-width:620px;width:100%;
     max-height:82dvh;overflow-y:auto;padding:1.4rem 1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .sheet h2{color:var(--gold);font-size:1rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem}
   .sheet h3{color:var(--ink);font-size:.86rem;margin:1.1rem 0 .4rem}
@@ -102,10 +103,10 @@
   .sheet .close{float:right;background:transparent;border:1px solid var(--line);color:var(--muted);
     border-radius:.4rem;width:30px;height:30px;font-size:1rem;cursor:pointer;line-height:1}
   .sheet .close:hover{color:var(--gold);border-color:var(--gold)}
-  .cmds{display:grid;grid-template-columns:auto 1fr;gap:.35rem .9rem;font-size:.82rem;align-items:baseline}
-  .cmds code{font-family:"Cascadia Code",Consolas,monospace;color:var(--gold);white-space:nowrap}
-  .cmds span{color:var(--muted)}
-  .types{margin-top:.5rem;font-size:.8rem;color:var(--muted)}
+  .cmds{display:grid;grid-template-columns:1fr 1fr;gap:.7rem .9rem;font-size:.82rem}
+  .cmds code{font-family:"Cascadia Code",Consolas,monospace;color:var(--gold);white-space:nowrap;display:block}
+  .cmds span{color:var(--muted);display:block;margin-top:.1rem}
+  @media (max-width:520px){ .cmds{grid-template-columns:1fr} }
   .types b{color:var(--ink);font-weight:600}
   @media (max-width:760px){
     .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.6)}
@@ -150,14 +151,12 @@
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
     <div class="markers" id="markers"></div>
+    <div class="legend">
+      <span class="sw" style="background:#966c42"></span><span>player builds</span>
+      <span class="sw" style="background:#3f5a37"></span><span>woodland, darker where denser</span>
+      <span class="sw" style="background:#8fae5c"></span><span>cleared — bare terrain shows through</span>
+    </div>
     <div class="mapui">
-      <div class="legend">
-        <span class="sw" style="background:#966c42"></span><span>player builds</span>
-        <span class="sw" style="background:#e4dbc4"></span><span>cleared woodland</span>
-        <span class="ic">📍</span><span>pins</span>
-        <span class="sw" style="background:var(--ok);border-radius:50%"></span><span>players online</span>
-        <span class="sw" style="background:#07090a"></span><span>unexplored</span>
-      </div>
       <div class="mapctl">
         <button id="zoomIn"  title="Zoom in">+</button>
         <button id="zoomOut" title="Zoom out">−</button>
@@ -178,13 +177,13 @@
 
     <h3>Pins</h3>
     <div class="cmds">
-      <code>!pin</code><span>drop an unnamed dot where you stand</span>
-      <code>!pin &lt;text&gt;</code><span>drop a dot with a label</span>
-      <code>!pin &lt;type&gt; &lt;text&gt;</code><span>drop a typed pin, e.g. <code>!pin house Base</code></span>
-      <code>!undoPin</code><span>remove your most recent pin</span>
-      <code>!deletePin &lt;text&gt;</code><span>remove the pin matching that text</span>
+      <div><code>!pin</code><span>drop an unnamed dot where you stand</span></div>
+      <div><code>!pin &lt;text&gt;</code><span>drop a dot with a label</span></div>
+      <div><code>!pin &lt;type&gt; &lt;text&gt;</code><span>a typed pin, e.g. <code>!pin house Base</code></span></div>
+      <div><code>!undoPin</code><span>remove your most recent pin</span></div>
+      <div><code>!deletePin &lt;text&gt;</code><span>remove the pin matching that text</span></div>
+      <div><code>types</code><span>dot · fire · mine · house · cave</span></div>
     </div>
-    <div class="types">Types: <b>dot</b> · <b>fire</b> · <b>mine</b> · <b>house</b> · <b>cave</b></div>
 
     <h3>Show yourself on the map</h3>
     <p>Press <b>M</b> in game and turn on <b>visible to other players</b>. Without it you
@@ -215,10 +214,6 @@ function structGlow(){
   if (st) st.style.filter = near
     ? "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))"
     : "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))";
-  const fr = document.getElementById("mapForest");
-  if (fr) fr.style.filter = near
-    ? "drop-shadow(0 0 1px rgba(0,0,0,.9))"
-    : "drop-shadow(0 0 3px rgba(236,228,205,.9)) drop-shadow(0 0 7px rgba(210,196,160,.5))";
 }
 function positionMarkers(){
   document.querySelectorAll("#markers .marker").forEach(el => {
@@ -303,7 +298,7 @@ let last = null, pinch = null;
 stage.addEventListener("pointerdown", e => {
   // Don't start a drag on the controls: capturing the pointer here retargets
   // the pointerup to the stage, so the button never receives its click.
-  if (e.target.closest && e.target.closest(".mapui")) return;
+  if (e.target.closest && e.target.closest(".mapui, .legend")) return;
   stage.setPointerCapture(e.pointerId);
   pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if(pts.size === 1){ last = {x:e.clientX, y:e.clientY}; stage.classList.add("dragging"); }
