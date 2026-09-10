@@ -24,6 +24,7 @@ jobs:
       - name: Push health to Statuspage
         env:
           WEBMAP_URL: ${{ vars.WEBMAP_URL || 'http://170.23.227.3:27021' }}
+          PROXY_URL: ${{ vars.PROXY_URL || 'https://valheim-proxy.hunterjsb.workers.dev/config' }}
           STATUSPAGE_API_KEY: ${{ secrets.STATUSPAGE_API_KEY }}
           STATUSPAGE_PAGE_ID: ${{ secrets.STATUSPAGE_PAGE_ID }}
           STATUSPAGE_SERVER_COMPONENT_ID: ${{ secrets.STATUSPAGE_SERVER_COMPONENT_ID }}
