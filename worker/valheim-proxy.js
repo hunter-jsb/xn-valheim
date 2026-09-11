@@ -27,7 +27,7 @@ const ROUTES = {
   "/structures/stats": { ttl: 10 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
-  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map", noNavigate: true },
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -92,7 +92,7 @@ export default {
     const headers = cors();
     const ct = upstream.headers.get("content-type");
     // the mod misspells this one as "applicaion/json"
-    headers.set("content-type", route.upstream === "/map" ? "image/png" : (ct && !ct.startsWith("applicaion") ? ct : "application/json"));
+    headers.set("content-type", ct && !ct.startsWith("applicaion") ? ct : "application/json");
     headers.set("cache-control", route.ttl ? `public, max-age=${route.ttl}` : "no-store");
     return new Response(upstream.body, { status: upstream.status, headers });
   },

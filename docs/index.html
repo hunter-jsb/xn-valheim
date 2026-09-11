@@ -180,8 +180,8 @@
     <div class="markers" id="markers"></div>
     <div class="maptrouble" id="maptrouble" hidden>
       <p>The map couldn't load.</p>
-      <p class="sub">Usually a blocked request — ad blockers and some DNS filters
-         block <code>workers.dev</code>, which is where the map data comes from.</p>
+      <p class="sub" id="mapwhy">Usually a blocked request — ad blockers and some DNS
+         filters block <code>workers.dev</code>, where the map data comes from.</p>
       <button id="mapretry">Retry</button>
     </div>
     <div class="mapui">
@@ -525,8 +525,40 @@ async function tickSlow(){                 // pins + fog: change rarely
   probe.src = API+"/fog?"+Date.now();
 }
 
+// The base render is several MB. Loaded as a bare <img> a slow link and a dead
+// request look identical, so it is streamed instead: bytes arriving means slow,
+// no bytes means broken, and a failure can report the actual status.
+async function loadBase(){
+  const el = document.getElementById("mapBase");
+  const url = API + "/base-6f3a9c2e?v=3";
+  try{
+    const res = await fetch(url, {cache:"force-cache"});
+    if(!res.ok){ mapTrouble(`the world render answered HTTP ${res.status}`); return; }
+    const total = +(res.headers.get("content-length") || 0);
+    let got = 0;
+    const reader = res.body && res.body.getReader ? res.body.getReader() : null;
+    let blob;
+    if(reader){
+      const chunks = [];
+      for(;;){
+        const {done, value} = await reader.read();
+        if(done) break;
+        chunks.push(value); got += value.length;
+        mapProgress(got, total);
+      }
+      blob = new Blob(chunks, {type: res.headers.get("content-type") || "image/jpeg"});
+    } else {
+      blob = await res.blob(); got = blob.size;
+    }
+    if(!got){ mapTrouble("the world render came back empty"); return; }
+    el.src = URL.createObjectURL(blob);     // same-origin, so the fog canvas stays untainted
+  }catch(e){
+    mapTrouble("the world render request failed: " + (e && e.message ? e.message : e));
+  }
+}
+
 async function boot(){
-  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=2";
+  loadBase();
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
   structImg.onload  = () => { structImg.style.display = ""; };
@@ -565,9 +597,21 @@ function layerReady(){
 // If either layer never arrives the map stays hidden forever, because the base
 // render must never be shown without its fog. Say so and offer a retry rather
 // than leaving a black rectangle.
-function mapTrouble(){
+function mapTrouble(why){
   if(inner.classList.contains("ready")) return;
   document.getElementById("maptrouble").hidden = false;
+  if(why) document.getElementById("mapwhy").textContent = why;
+}
+let _bytes = 0;
+function mapProgress(got, total){
+  _bytes = got;
+  if(inner.classList.contains("ready")) return;
+  const el = document.getElementById("mapwhy");
+  const mb = (got/1048576).toFixed(1);
+  el.textContent = total ? `loading the world render… ${mb} MB of ${(total/1048576).toFixed(1)} MB`
+                         : `loading the world render… ${mb} MB`;
+  document.getElementById("maptrouble").hidden = false;
+  document.getElementById("mapretry").hidden = true;
 }
 ["mapBase","mapFog"].forEach(id => {
   const el = document.getElementById(id);
@@ -576,11 +620,17 @@ function mapTrouble(){
   el.addEventListener("error", mapTrouble);
 });
 // covers a request that hangs without ever firing load or error
-setTimeout(mapTrouble, 20000);
+setTimeout(() => {
+  if(inner.classList.contains("ready")) return;
+  mapTrouble(_bytes ? "the world render is still downloading — slow connection?"
+                    : "nothing arrived within 20 seconds");
+  document.getElementById("mapretry").hidden = false;
+}, 20000);
 document.getElementById("mapretry").addEventListener("click", () => {
   _layers = 0;
   document.getElementById("maptrouble").hidden = true;
-  document.getElementById("mapBase").src = API + "/base-6f3a9c2e?r=" + Date.now();
+  document.getElementById("mapretry").hidden = true;
+  loadBase();
   tickSlow();
   setTimeout(mapTrouble, 20000);
 });
