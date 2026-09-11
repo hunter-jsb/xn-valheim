@@ -92,6 +92,9 @@
   .maptrouble p{margin:0;font-size:.9rem}
   .maptrouble .sub{color:var(--muted);font-size:.76rem;max-width:32ch;line-height:1.5}
   .maptrouble code{font-family:"Cascadia Code",Consolas,monospace;color:var(--gold)}
+  .maptrouble .diag{font-family:"Cascadia Code",Consolas,monospace;font-size:.7rem;
+    color:var(--muted);background:#12150f;border:1px solid var(--line);border-radius:.4rem;
+    padding:.5rem .6rem;margin:.2rem 0 0;text-align:left;white-space:pre;overflow-x:auto;max-width:90vw}
   .maptrouble button{margin-top:.4rem;padding:.4rem .9rem;border-radius:.45rem;
     border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
   .maptrouble button:hover{border-color:var(--gold);color:var(--gold)}
@@ -165,6 +168,7 @@
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
+      <span id="buildstamp"></span> ·
       <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a> ·
       <a href="https://indifferentbroccoli.com/valheim-server-hosting">indifferent broccoli</a>
     </div>
@@ -184,6 +188,7 @@
     <div class="maptrouble" id="maptrouble" hidden>
       <p>The map couldn't load.</p>
       <p class="sub" id="mapwhy">Something went wrong fetching it.</p>
+      <pre class="diag" id="mapdiag" hidden></pre>
       <button id="mapretry">Retry</button>
     </div>
     <div class="mapui">
@@ -397,6 +402,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 // Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
 // forgotten tab costs nothing.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
+const BUILD = "2026-09-11d";
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -534,7 +540,7 @@ async function loadBase(){
   const el = document.getElementById("mapBase");
   const url = API + "/base-6f3a9c2e?v=3";
   try{
-    const res = await fetch(url, {cache:"force-cache"});
+    const res = await fetch(url);
     if(!res.ok){
       if(++_retries.mapBase <= 3){ setTimeout(loadBase, _retries.mapBase * 2500); return; }
       mapTrouble(`the world render answered HTTP ${res.status}`);
@@ -569,6 +575,7 @@ async function loadBase(){
 }
 
 async function boot(){
+  document.getElementById("buildstamp").textContent = "build " + BUILD;
   loadBase();
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
@@ -616,6 +623,30 @@ function mapTrouble(why){
   document.getElementById("mapretry").hidden = false;
   document.getElementById("mapwhy").textContent = why ||
     "Ad blockers and some DNS filters block workers.dev, where the map data comes from.";
+  runDiagnostic();
+}
+// Probes every endpoint the map needs and prints the result, so one screenshot
+// says which piece failed instead of leaving it to guesswork.
+let _diagRunning = false;
+async function runDiagnostic(){
+  if(_diagRunning) return;
+  _diagRunning = true;
+  const el = document.getElementById("mapdiag");
+  el.hidden = false;
+  el.textContent = "checking…";
+  const lines = ["build " + BUILD, "online " + navigator.onLine];
+  for(const path of ["/config", "/fog", "/base-6f3a9c2e?v=3"]){
+    const t0 = performance.now();
+    try{
+      const r = await fetch(API + path, {cache:"no-store"});
+      const buf = await r.arrayBuffer();
+      lines.push(`${path.split("?")[0].padEnd(16)} ${r.status}  ${buf.byteLength} bytes  ${Math.round(performance.now()-t0)}ms`);
+    }catch(e){
+      lines.push(`${path.split("?")[0].padEnd(16)} FAILED  ${(e && e.message) || e}`);
+    }
+  }
+  el.textContent = lines.join("\n");
+  _diagRunning = false;
 }
 let _bytes = 0;
 function mapProgress(got, total){
