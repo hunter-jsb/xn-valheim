@@ -19,15 +19,15 @@ const ROUTES = {
   "/players":  { ttl: 0 },
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
-  "/fog":      { ttl: 5 },
-  "/forest": { ttl: 60 },
+  "/fog":      { ttl: 5, image: true },
+  "/forest": { ttl: 60, image: true },
   "/forest/stats": { ttl: 30 },
-  "/structures": { ttl: 30 },
+  "/structures": { ttl: 30, image: true },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
-  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map", noNavigate: true },
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map", noNavigate: true, image: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -62,14 +62,30 @@ export default {
 
     let upstream;
     try {
+      // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat TTL
+      // caches errors too, and one fetch during a restart then poisons that edge
+      // for the whole TTL -- which reads as "the map is broken for one player".
       upstream = await fetch(UPSTREAM + (route.upstream || url.pathname), {
         method: "GET",
-        cf: route.ttl ? { cacheTtl: route.ttl, cacheEverything: true } : { cacheTtl: 0 },
+        cf: route.ttl
+          ? { cacheEverything: true,
+              cacheTtlByStatus: { "200-299": route.ttl, "300-399": 0, "400-499": 0, "500-599": 0 } }
+          : { cacheTtl: 0 },
       });
     } catch (e) {
       // The game server being down must not look like the Worker being broken.
       return new Response(JSON.stringify({ error: "upstream unreachable" }),
         { status: 502, headers: { ...Object.fromEntries(cors()), "content-type": "application/json" } });
+    }
+
+    // A 2xx is not enough: the mod answers 200 with an empty body until a texture
+    // has rendered once, and cached, that is a broken image for the whole TTL.
+    // Images only -- an empty /pins just means nobody has placed one.
+    if (route.image && upstream.headers.get("content-length") === "0") {
+      return new Response(JSON.stringify({ error: "not rendered yet" }),
+        { status: 503, headers: { ...Object.fromEntries(cors()),
+                                  "content-type": "application/json",
+                                  "cache-control": "no-store" } });
     }
 
     const headers = cors();
