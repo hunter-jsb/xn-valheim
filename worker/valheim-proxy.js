@@ -19,15 +19,15 @@ const ROUTES = {
   "/players":  { ttl: 0 },
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
-  "/fog":      { ttl: 5, image: true },
-  "/forest": { ttl: 60, image: true },
+  "/fog":      { ttl: 5 },
+  "/forest": { ttl: 60 },
   "/forest/stats": { ttl: 30 },
-  "/structures": { ttl: 30, image: true },
+  "/structures": { ttl: 30 },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
-  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map", noNavigate: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -62,15 +62,9 @@ export default {
 
     let upstream;
     try {
-      // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat
-      // TTL pins errors too, so one fetch during a restart poisons that edge for
-      // the whole TTL -- which looks like "the map is broken for one player".
       upstream = await fetch(UPSTREAM + (route.upstream || url.pathname), {
         method: "GET",
-        cf: route.ttl
-          ? { cacheEverything: true,
-              cacheTtlByStatus: { "200-299": route.ttl, "300-399": 0, "400-499": 0, "500-599": 0 } }
-          : { cacheTtl: 0 },
+        cf: route.ttl ? { cacheTtl: route.ttl, cacheEverything: true } : { cacheTtl: 0 },
       });
     } catch (e) {
       // The game server being down must not look like the Worker being broken.
@@ -78,22 +72,10 @@ export default {
         { status: 502, headers: { ...Object.fromEntries(cors()), "content-type": "application/json" } });
     }
 
-    // The mod answers 200 with an empty body until a texture has been rendered
-    // once. Cached, that is a broken image for as long as the TTL lasts, so it
-    // must never be stored. Only for images though: an empty /pins is just
-    // "nobody has placed one yet".
-    const len = upstream.headers.get("content-length");
-    if (upstream.status !== 200 || (route.image && len === "0")) {
-      return new Response(JSON.stringify({ error: "upstream not ready", status: upstream.status }),
-        { status: 503, headers: { ...Object.fromEntries(cors()),
-                                  "content-type": "application/json",
-                                  "cache-control": "no-store" } });
-    }
-
     const headers = cors();
     const ct = upstream.headers.get("content-type");
     // the mod misspells this one as "applicaion/json"
-    headers.set("content-type", ct && !ct.startsWith("applicaion") ? ct : "application/json");
+    headers.set("content-type", route.upstream === "/map" ? "image/png" : (ct && !ct.startsWith("applicaion") ? ct : "application/json"));
     headers.set("cache-control", route.ttl ? `public, max-age=${route.ttl}` : "no-store");
     return new Response(upstream.body, { status: upstream.status, headers });
   },
