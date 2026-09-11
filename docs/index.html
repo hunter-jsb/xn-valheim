@@ -178,10 +178,12 @@
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
     <div class="markers" id="markers"></div>
+    <div class="maptrouble" id="maploading" hidden>
+      <p id="maploadtext">Loading the world map…</p>
+    </div>
     <div class="maptrouble" id="maptrouble" hidden>
       <p>The map couldn't load.</p>
-      <p class="sub" id="mapwhy">Usually a blocked request — ad blockers and some DNS
-         filters block <code>workers.dev</code>, where the map data comes from.</p>
+      <p class="sub" id="mapwhy">Something went wrong fetching it.</p>
       <button id="mapretry">Retry</button>
     </div>
     <div class="mapui">
@@ -533,7 +535,11 @@ async function loadBase(){
   const url = API + "/base-6f3a9c2e?v=3";
   try{
     const res = await fetch(url, {cache:"force-cache"});
-    if(!res.ok){ mapTrouble(`the world render answered HTTP ${res.status}`); return; }
+    if(!res.ok){
+      if(++_retries.mapBase <= 3){ setTimeout(loadBase, _retries.mapBase * 2500); return; }
+      mapTrouble(`the world render answered HTTP ${res.status}`);
+      return;
+    }
     const total = +(res.headers.get("content-length") || 0);
     let got = 0;
     const reader = res.body && res.body.getReader ? res.body.getReader() : null;
@@ -550,9 +556,14 @@ async function loadBase(){
     } else {
       blob = await res.blob(); got = blob.size;
     }
-    if(!got){ mapTrouble("the world render came back empty"); return; }
+    if(!got){
+      if(++_retries.mapBase <= 3){ setTimeout(loadBase, _retries.mapBase * 2500); return; }
+      mapTrouble("the world render came back empty");
+      return;
+    }
     el.src = URL.createObjectURL(blob);     // same-origin, so the fog canvas stays untainted
   }catch(e){
+    if(++_retries.mapBase <= 3){ setTimeout(loadBase, _retries.mapBase * 2500); return; }
     mapTrouble("the world render request failed: " + (e && e.message ? e.message : e));
   }
 }
@@ -591,6 +602,7 @@ function layerReady(){
   if(++_layers >= 2){
     inner.classList.add("ready");
     document.getElementById("maptrouble").hidden = true;
+    document.getElementById("maploading").hidden = true;
     fitExplored(true);
   }
 }
@@ -599,37 +611,47 @@ function layerReady(){
 // than leaving a black rectangle.
 function mapTrouble(why){
   if(inner.classList.contains("ready")) return;
+  document.getElementById("maploading").hidden = true;
   document.getElementById("maptrouble").hidden = false;
-  if(why) document.getElementById("mapwhy").textContent = why;
+  document.getElementById("mapretry").hidden = false;
+  document.getElementById("mapwhy").textContent = why ||
+    "Ad blockers and some DNS filters block workers.dev, where the map data comes from.";
 }
 let _bytes = 0;
 function mapProgress(got, total){
   _bytes = got;
   if(inner.classList.contains("ready")) return;
-  const el = document.getElementById("mapwhy");
   const mb = (got/1048576).toFixed(1);
-  el.textContent = total ? `loading the world render… ${mb} MB of ${(total/1048576).toFixed(1)} MB`
-                         : `loading the world render… ${mb} MB`;
-  document.getElementById("maptrouble").hidden = false;
-  document.getElementById("mapretry").hidden = true;
+  document.getElementById("maploadtext").textContent = total
+    ? `Loading the world map… ${mb} of ${(total/1048576).toFixed(1)} MB`
+    : `Loading the world map… ${mb} MB`;
+  document.getElementById("maploading").hidden = false;
 }
+const _retries = {mapBase: 0, mapFog: 0};
 ["mapBase","mapFog"].forEach(id => {
   const el = document.getElementById(id);
   if(el.complete && el.naturalWidth) layerReady();
   else el.addEventListener("load", layerReady, {once:true});
-  el.addEventListener("error", mapTrouble);
+  el.addEventListener("error", () => {
+    if(inner.classList.contains("ready")) return;
+    if(++_retries[id] <= 3){
+      setTimeout(() => { id === "mapBase" ? loadBase() : tickSlow(); }, _retries[id] * 2500);
+      return;
+    }
+    mapTrouble(id === "mapBase" ? "the world render could not be fetched"
+                                : "the explored-areas mask could not be fetched");
+  });
 });
 // covers a request that hangs without ever firing load or error
+// only a genuine stall is a failure; a download in progress shows progress
 setTimeout(() => {
-  if(inner.classList.contains("ready")) return;
-  mapTrouble(_bytes ? "the world render is still downloading — slow connection?"
-                    : "nothing arrived within 20 seconds");
-  document.getElementById("mapretry").hidden = false;
-}, 20000);
+  if(inner.classList.contains("ready") || _bytes) return;
+  mapTrouble("nothing arrived within 30 seconds");
+}, 30000);
 document.getElementById("mapretry").addEventListener("click", () => {
   _layers = 0;
   document.getElementById("maptrouble").hidden = true;
-  document.getElementById("mapretry").hidden = true;
+  _retries.mapBase = 0; _retries.mapFog = 0;
   loadBase();
   tickSlow();
   setTimeout(mapTrouble, 20000);
