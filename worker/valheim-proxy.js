@@ -25,8 +25,8 @@ const ROUTES = {
   "/structures": { ttl: 30, image: true },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
-  // boats and carts move, but the sweep behind them only runs every 2 min
-  "/vehicles": { ttl: 20 },
+  // boats and carts move; freshness comes from nudging the sweep below
+  "/vehicles": { ttl: 3, nudge: true },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },
@@ -42,8 +42,33 @@ function cors() {
   return h;
 }
 
+// The mod rebuilds vehicle positions only when its world sweep runs, every two
+// minutes, and that sweep walks ~370k ZDOs on the same CPU as the game -- so it
+// is not something to simply run more often. Instead a request for /vehicles
+// asks for one, at most once per NUDGE_SECONDS, so sweeps happen while someone
+// is actually watching the map and not at all when nobody is.
+//
+// Only a real page view asks: the nudge is gated on the site's own Origin, so a
+// scraper or a bare curl reads whatever is current and never costs a sweep.
+//
+// The rate limit is the edge cache holding the refresh response itself -- the
+// same mechanism the routes above use, rather than the Cache API, which is
+// documented as a no-op on workers.dev and would fail open, turning every poll
+// into a sweep. Still per-PoP: viewers on different continents each get their
+// own window. Bounding it globally needs server-side state; this is
+// deliberately the cheap version, and an in-progress sweep refuses a second.
+const NUDGE_SECONDS = 90;
+function nudgeSweep(ctx) {
+  ctx.waitUntil(
+    fetch(UPSTREAM + "/structures/refresh", {
+      cf: { cacheEverything: true,
+            cacheTtlByStatus: { "200-299": NUDGE_SECONDS, "300-399": 0,
+                                "400-499": 0, "500-599": 0 } },
+    }).catch(() => {}));                     // a missed nudge just means stale data
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
@@ -60,6 +85,10 @@ export default {
     // is not. Refuse the former so the whole map isn't one click from curiosity.
     if (route.noNavigate && request.headers.get("Sec-Fetch-Dest") === "document") {
       return new Response("not found", { status: 404, headers: cors() });
+    }
+
+    if (route.nudge && ctx && ALLOWED_ORIGINS.has(request.headers.get("Origin"))) {
+      try { nudgeSweep(ctx); } catch (e) {}
     }
 
     let upstream;

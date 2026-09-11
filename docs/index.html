@@ -391,7 +391,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-11g";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-11h";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -494,6 +494,15 @@ async function tickFast(){                 // players + chat: the things that mo
     document.getElementById("stamp").textContent = "server unreachable";
   }
 }
+// Asking for this is also what tells the server to re-sweep, so polling it is
+// what keeps boats current rather than merely reading a stale answer sooner.
+async function tickVehicles(){
+  try{
+    const vj = await api("/vehicles").then(r=>r.json());
+    VEHICLES = (vj.vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
+    renderTiles();
+  }catch(e){}
+}
 async function tickSlow(){                 // pins + fog: change rarely
   try{
     const csv = await api("/pins").then(r=>r.text());
@@ -505,10 +514,6 @@ async function tickSlow(){                 // pins + fog: change rarely
       return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
     }).filter(Boolean);
     renderTiles();
-  }catch(e){}
-  try{
-    const vj = await api("/vehicles").then(r=>r.json());
-    VEHICLES = (vj.vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
   }catch(e){}
   try{ FOREST = await api("/forest/stats").then(r=>r.json()); }catch(e){}
   renderTiles();
@@ -550,9 +555,11 @@ async function boot(){
   }catch(e){}
   await tickFast();
   await tickSlow();
+  await tickVehicles();
   // visibility-gated so a background tab makes no requests
   setInterval(()=>{ if(document.visibilityState==="visible") tickFast(); }, 5000);
   setInterval(()=>{ if(document.visibilityState==="visible") tickSlow(); }, 30000);
+  setInterval(()=>{ if(document.visibilityState==="visible") tickVehicles(); }, 10000);
   tickStatus();
   setInterval(()=>{ if(document.visibilityState==="visible") tickStatus(); }, 60000);
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickFast(); });
