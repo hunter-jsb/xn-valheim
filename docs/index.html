@@ -75,6 +75,8 @@
   .mapinner.ready{visibility:visible}
   .marker.pin .ic{font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.pin .nm{color:var(--gold)}
+  /* parked kit, not people: visible on a look but never competing with players */
+  .marker.veh .ic{font-size:12px;line-height:1;opacity:.85;filter:drop-shadow(0 1px 2px #000)}
   .stamp{color:var(--muted);font-size:.72rem;margin-top:1rem}
   .sidefoot{color:var(--muted);font-size:.72rem;margin-top:.8rem;border-top:1px solid var(--line);padding-top:.8rem}
 
@@ -153,6 +155,8 @@
       <span class="sw" style="background:#966c42"></span><span>player builds</span>
       <span class="sw" style="background:#3f5a37"></span><span>woodland, darker where denser</span>
       <span class="sw" style="background:#8fae5c"></span><span>cleared — bare terrain shows through</span>
+      <span class="ic">⛵</span><span>boat</span>
+      <span class="ic">🛒</span><span>cart</span>
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
@@ -236,7 +240,7 @@ function positionMarkers(){
   });
 }
 const PIN_ICON = {dot:"\u25CF", fire:"\uD83D\uDD25", mine:"\u26CF\uFE0F", house:"\uD83C\uDFE0", cave:"\uD83D\uDD73\uFE0F"};
-function buildMarkers(players, pinList){
+function buildMarkers(players, pinList, vehicles){
   const p = (players||[]).map(m =>
     `<div class="marker" data-px="${m.px}" data-py="${m.py}">`
     + `<span class="dot"></span><span class="nm">${esc(m.name)}</span></div>`);
@@ -244,7 +248,11 @@ function buildMarkers(players, pinList){
     `<div class="marker pin" data-px="${m.px}" data-py="${m.py}" title="${esc(m.owner||"")}">`
     + `<span class="ic">${PIN_ICON[m.type] || PIN_ICON.dot}</span>`
     + (m.text ? `<span class="nm">${esc(m.text)}</span>` : "") + `</div>`);
-  document.getElementById("markers").innerHTML = p.concat(q).join("");
+  // named on hover only -- a harbour with six boats would be a wall of text
+  const v = (vehicles||[]).map(m =>
+    `<div class="marker veh" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||m.kind)}">`
+    + `<span class="ic">${m.kind === "cart" ? "\uD83D\uDED2" : "\u26F5"}</span></div>`);
+  document.getElementById("markers").innerHTML = p.concat(q).concat(v).join("");
   positionMarkers();
 }
 function clamp(v,a,b){ return Math.min(b,Math.max(a,v)); }
@@ -381,7 +389,9 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 // Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
 // forgotten tab costs nothing.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
-const BUILD = "2026-09-11f";   // shown in the footer, so a stale page is obvious
+let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
+let FOREST = {};          // /forest/stats: trees standing, stumps cut
+const BUILD = "2026-09-11g";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -445,6 +455,8 @@ function renderTiles(){
     tile("World", esc(GEOM.world || "Mothership")),
     tile("Version", "1.0"),
     tile("Explored", EXPLORED==null ? "\u2014" : (EXPLORED*100).toFixed(1), EXPLORED==null?"":"%"),
+    tile("Felled", FOREST.stumps==null ? "\u2014" : FOREST.stumps.toLocaleString(), " trees"),
+    tile("Afloat", VEHICLES==null ? "\u2014" : VEHICLES.filter(v=>v.kind==="boat").length, " boats"),
   ].join("");
   const list = (PLAYERS && PLAYERS.players) || [];
   const hiddenCount = list.filter(p=>p.hidden).length;
@@ -452,7 +464,8 @@ function renderTiles(){
   if(list.length && hiddenCount === list.length)
     line += `<br><span style="font-size:.7rem">not shown on map \u2014 enable \u201cvisible to other players\u201d on the in-game map (M)</span>`;
   document.getElementById("online").innerHTML = line;
-  buildMarkers(list.filter(p=>p.x!=null && p.z!=null).map(p=>({name:p.name, ...toPx(p.x,p.z)})), PINS);
+  buildMarkers(list.filter(p=>p.x!=null && p.z!=null).map(p=>({name:p.name, ...toPx(p.x,p.z)})),
+               PINS, VEHICLES);
 }
 function renderFeed(msgs){
   const el=document.getElementById("feed");
@@ -493,6 +506,12 @@ async function tickSlow(){                 // pins + fog: change rarely
     }).filter(Boolean);
     renderTiles();
   }catch(e){}
+  try{
+    const vj = await api("/vehicles").then(r=>r.json());
+    VEHICLES = (vj.vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
+  }catch(e){}
+  try{ FOREST = await api("/forest/stats").then(r=>r.json()); }catch(e){}
+  renderTiles();
   const st=document.getElementById("mapStruct");
   const sProbe=new Image();
   sProbe.crossOrigin="anonymous";

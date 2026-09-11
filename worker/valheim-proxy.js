@@ -25,6 +25,8 @@ const ROUTES = {
   "/structures": { ttl: 30, image: true },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
+  // boats and carts move, but the sweep behind them only runs every 2 min
+  "/vehicles": { ttl: 20 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },
