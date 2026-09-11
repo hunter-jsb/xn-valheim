@@ -86,6 +86,15 @@
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
   #mapForest{mix-blend-mode:multiply}
   #mapFog{mix-blend-mode:multiply}
+  .maptrouble{position:absolute;inset:0;z-index:11;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:.5rem;text-align:center;padding:1.5rem;
+    color:var(--ink);background:#0a0c0a}
+  .maptrouble p{margin:0;font-size:.9rem}
+  .maptrouble .sub{color:var(--muted);font-size:.76rem;max-width:32ch;line-height:1.5}
+  .maptrouble code{font-family:"Cascadia Code",Consolas,monospace;color:var(--gold)}
+  .maptrouble button{margin-top:.4rem;padding:.4rem .9rem;border-radius:.45rem;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+  .maptrouble button:hover{border-color:var(--gold);color:var(--gold)}
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
   .mapctl{display:flex;flex-direction:column;gap:.35rem}
   .legend{margin-top:1rem;border-top:1px solid var(--line);padding-top:.8rem;
@@ -169,6 +178,12 @@
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
     <div class="markers" id="markers"></div>
+    <div class="maptrouble" id="maptrouble" hidden>
+      <p>The map couldn't load.</p>
+      <p class="sub">Usually a blocked request — ad blockers and some DNS filters
+         block <code>workers.dev</code>, which is where the map data comes from.</p>
+      <button id="mapretry">Retry</button>
+    </div>
     <div class="mapui">
       <div class="mapctl">
         <button id="zoomIn"  title="Zoom in">+</button>
@@ -511,7 +526,7 @@ async function tickSlow(){                 // pins + fog: change rarely
 }
 
 async function boot(){
-  document.getElementById("mapBase").src = API+"/base-6f3a9c2e";
+  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=2";
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
   structImg.onload  = () => { structImg.style.display = ""; };
@@ -543,13 +558,31 @@ let _layers = 0;
 function layerReady(){
   if(++_layers >= 2){
     inner.classList.add("ready");
+    document.getElementById("maptrouble").hidden = true;
     fitExplored(true);
   }
+}
+// If either layer never arrives the map stays hidden forever, because the base
+// render must never be shown without its fog. Say so and offer a retry rather
+// than leaving a black rectangle.
+function mapTrouble(){
+  if(inner.classList.contains("ready")) return;
+  document.getElementById("maptrouble").hidden = false;
 }
 ["mapBase","mapFog"].forEach(id => {
   const el = document.getElementById(id);
   if(el.complete && el.naturalWidth) layerReady();
   else el.addEventListener("load", layerReady, {once:true});
+  el.addEventListener("error", mapTrouble);
+});
+// covers a request that hangs without ever firing load or error
+setTimeout(mapTrouble, 20000);
+document.getElementById("mapretry").addEventListener("click", () => {
+  _layers = 0;
+  document.getElementById("maptrouble").hidden = true;
+  document.getElementById("mapBase").src = API + "/base-6f3a9c2e?r=" + Date.now();
+  tickSlow();
+  setTimeout(mapTrouble, 20000);
 });
 boot();
 </script>
