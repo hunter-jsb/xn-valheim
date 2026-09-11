@@ -19,15 +19,15 @@ const ROUTES = {
   "/players":  { ttl: 0 },
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
-  "/fog":      { ttl: 5 },
-  "/forest": { ttl: 60 },
+  "/fog":      { ttl: 5, image: true },
+  "/forest": { ttl: 60, image: true },
   "/forest/stats": { ttl: 30 },
-  "/structures": { ttl: 30 },
+  "/structures": { ttl: 30, image: true },
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
-  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true },
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -80,9 +80,10 @@ export default {
 
     // The mod answers 200 with an empty body until a texture has been rendered
     // once. Cached, that is a broken image for as long as the TTL lasts, so it
-    // must never be stored.
+    // must never be stored. Only for images though: an empty /pins is just
+    // "nobody has placed one yet".
     const len = upstream.headers.get("content-length");
-    if (upstream.status !== 200 || len === "0") {
+    if (upstream.status !== 200 || (route.image && len === "0")) {
       return new Response(JSON.stringify({ error: "upstream not ready", status: upstream.status }),
         { status: 503, headers: { ...Object.fromEntries(cors()),
                                   "content-type": "application/json",
