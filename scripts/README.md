@@ -16,6 +16,7 @@ export ANNOUNCE_TOKEN=...         # only for announce/--warn; matches the mod's 
 | `ops.py backup`   | trigger a world backup |
 | `ops.py rcon "…"` | send an RCON/console command |
 | `ops.py announce "…"` | shout a line in the in-game chat |
+| `ops.py update` | update the game build, waiting for steamcmd to finish |
 | `ops.py restart --warn 60 --reason "…"` | warn players in chat, wait, then restart |
 | `ops.py admins`   | print `adminlist.txt` |
 | `collect.py`      | write `docs/data/status.json` for the metrics page |

@@ -37,12 +37,20 @@ there is no apply-without-restart path.
 | Endpoint | Purpose |
 |----------|---------|
 | `/start` `/stop` `/restart` `/resetserver` | power actions |
-| `/updateserver` | update / revert game version |
+| `/updateserver` | update / revert game version (see note below) |
 | `/transferregion` | move to another region |
 | `/saveconfig` | server settings (name, password, world, crossplay, modifiers, max players) |
 | `/savemods` | Thunderstore mod list |
 | `/saveGameIni` | raw game config |
 | `/scheduler` | scheduled auto-restarts (`slots`) |
+
+> `/updateserver` takes only `serverLinuxUsername` — the panel's own button posts
+> nothing else. The install then runs **asynchronously and takes 20+ minutes**.
+> **Do not call `/start` while it runs**: it boots the old binaries and aborts the
+> download, leaving `steamapps/appmanifest_<appid>.acf` at `buildid 0` with an empty
+> `InstalledDepots`, which reads exactly like the update having silently failed.
+> Poll that manifest's `buildid` against Steam's published build instead; the panel
+> restarts the server itself when it finishes.
 
 > `saveconfig` field names are Alpine-bound and not in static HTML; capture them
 > from one real "Save Config" request in browser devtools before automating writes.

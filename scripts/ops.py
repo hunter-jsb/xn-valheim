@@ -9,6 +9,7 @@ Auth from env: IB_EMAIL + IB_PASSWORD  (or IB_SESSION = an indifferentSess cooki
   uv run --project scripts scripts/ops.py rcon "save"
   uv run --project scripts scripts/ops.py admins            # print adminlist.txt
   uv run --project scripts scripts/ops.py activity
+  uv run --project scripts scripts/ops.py update              # game version, waits it out
   uv run --project scripts scripts/ops.py announce "back in 5"
   uv run --project scripts scripts/ops.py restart --warn 60 --reason "map mod update"
 
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -31,6 +33,52 @@ from ib import IBClient  # noqa: E402
 
 ADMINLIST = ".config/unity3d/IronGate/Valheim/adminlist.txt"
 WEBMAP_URL = os.environ.get("WEBMAP_URL", "http://170.23.227.3:27021")
+SERVER_APPID = 896660
+MANIFEST = f"steamcmd/valheim/steamapps/appmanifest_{SERVER_APPID}.acf"
+
+
+def steam_buildid() -> str:
+    """The build Steam is currently serving for the dedicated server."""
+    with urllib.request.urlopen(
+            f"https://api.steamcmd.net/v1/info/{SERVER_APPID}", timeout=25) as r:
+        d = json.load(r)
+    return str(d["data"][str(SERVER_APPID)]["depots"]["branches"]["public"]["buildid"])
+
+
+def installed_buildid(c, u) -> str:
+    try:
+        m = re.search(r'"buildid"\s+"(\d+)"', c.read_file(u, MANIFEST))
+        return m.group(1) if m else "0"
+    except Exception:
+        return "0"
+
+
+def do_update(c, u):
+    """Trigger the panel update and wait for steamcmd to finish.
+
+    The install runs asynchronously and takes 20+ minutes. Starting the server
+    while it downloads aborts it -- the manifest is left at buildid 0 with no
+    installed depots and the old binaries boot again, which looks exactly like
+    the update silently failing. So: never start it here, just wait.
+    """
+    want = steam_buildid()
+    have = installed_buildid(c, u)
+    print(f"steam build {want} | installed {have}")
+    if have == want:
+        print("already current")
+        return
+    print(json.dumps(c.update_version(u))[:120])
+    deadline = time.time() + 45 * 60
+    while time.time() < deadline:
+        time.sleep(60)
+        have = installed_buildid(c, u)
+        left = int((deadline - time.time()) / 60)
+        print(f"  installed {have} (want {want}); {left} min left")
+        if have == want:
+            print("update complete; the panel restarts the server itself")
+            return
+    print("still not installed after 45 min - check the panel", file=sys.stderr)
+    sys.exit(1)
 
 
 def announce(text: str) -> bool:
@@ -67,7 +115,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["status", "start", "stop", "restart",
                                     "backup", "rcon", "admins", "activity",
-                                    "announce"])
+                                    "announce", "update"])
     ap.add_argument("arg", nargs="?", default="")
     ap.add_argument("--game", default="Valheim")
     ap.add_argument("--warn", type=int, metavar="SECONDS",
@@ -82,6 +130,8 @@ def main():
     if a.cmd == "status":
         print(json.dumps({"server": sv.__dict__,
                           "activity": c.activity(u)[:5]}, indent=2, default=str))
+    elif a.cmd == "update":
+        do_update(c, u)
     elif a.cmd == "announce":
         if not a.arg:
             sys.exit("usage: ops.py announce '<message>'")
