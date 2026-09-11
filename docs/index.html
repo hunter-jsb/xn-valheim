@@ -381,7 +381,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 // Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
 // forgotten tab costs nothing.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
-const BUILD = "2026-09-11e";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-11f";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -514,7 +514,7 @@ async function tickSlow(){                 // pins + fog: change rarely
 
 async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
-  document.getElementById("mapBase").src = API+"/base-6f3a9c2e";
+  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=jpg";
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
   structImg.onload  = () => { structImg.style.display = ""; };
