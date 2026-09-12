@@ -337,8 +337,9 @@ function drawPortalLinks(){
   svg.innerHTML = out;
 }
 
-// Age comes from the world's own clock, so it reads in in-game days, which is
-// what a player actually reckons in.
+// Age is stamped against ZNet's world clock, which advances in real seconds
+// while the server runs -- so this reads as real hours and days, not the
+// 30-minute in-game day, which is what a player actually wants to know.
 function graveAge(sec){
   const d = sec/86400;
   if(d >= 1){ const t = d<10 ? (Math.round(d*10)/10) : Math.round(d);
