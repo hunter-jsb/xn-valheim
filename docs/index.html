@@ -155,7 +155,9 @@
       <span class="sw" style="background:#966c42"></span><span>player builds</span>
       <span class="sw" style="background:#3f5a37"></span><span>woodland, darker where denser</span>
       <span class="sw" style="background:#8fae5c"></span><span>cleared — bare terrain shows through</span>
-      <span class="ic">⛵</span><span>boat</span>
+      <span class="ic">🛶</span><span>raft</span>
+      <span class="ic">⛵</span><span>karve</span>
+      <span class="ic">🚢</span><span>longship</span>
       <span class="ic">🛒</span><span>cart</span>
     </div>
     <p class="stamp" id="stamp"></p>
@@ -240,6 +242,20 @@ function positionMarkers(){
   });
 }
 const PIN_ICON = {dot:"\u25CF", fire:"\uD83D\uDD25", mine:"\u26CF\uFE0F", house:"\uD83C\uDFE0", cave:"\uD83D\uDD73\uFE0F"};
+// Keyed on the prefab name the mod reports. A hull it doesn't know still draws as a
+// boat rather than vanishing, so a ship added in a later patch needs no change here.
+const VEHICLE = {
+  raft:       {icon:"\uD83D\uDEF6", label:"Raft",      size:11},
+  karve:      {icon:"\u26F5",             label:"Karve",     size:13},
+  vikingship: {icon:"\uD83D\uDEA2", label:"Longship",  size:16},
+  cart:       {icon:"\uD83D\uDED2", label:"Cart",      size:12},
+};
+function vehicleStyle(m){
+  const v = VEHICLE[(m.name||"").toLowerCase()];
+  if (v) return v;
+  return m.kind === "cart" ? VEHICLE.cart
+                           : {icon:"\u26F5", label:m.name || "Boat", size:13};
+}
 function buildMarkers(players, pinList, vehicles){
   const p = (players||[]).map(m =>
     `<div class="marker" data-px="${m.px}" data-py="${m.py}">`
@@ -248,10 +264,13 @@ function buildMarkers(players, pinList, vehicles){
     `<div class="marker pin" data-px="${m.px}" data-py="${m.py}" title="${esc(m.owner||"")}">`
     + `<span class="ic">${PIN_ICON[m.type] || PIN_ICON.dot}</span>`
     + (m.text ? `<span class="nm">${esc(m.text)}</span>` : "") + `</div>`);
-  // named on hover only -- a harbour with six boats would be a wall of text
-  const v = (vehicles||[]).map(m =>
-    `<div class="marker veh" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||m.kind)}">`
-    + `<span class="ic">${m.kind === "cart" ? "\uD83D\uDED2" : "\u26F5"}</span></div>`);
+  // named on hover only -- a harbour with six boats would be a wall of text.
+  // Hull size is drawn to scale so a longship reads as one without a label.
+  const v = (vehicles||[]).map(m => {
+    const st = vehicleStyle(m);
+    return `<div class="marker veh" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
+      + `<span class="ic" style="font-size:${st.size}px">${st.icon}</span></div>`;
+  });
   document.getElementById("markers").innerHTML = p.concat(q).concat(v).join("");
   positionMarkers();
 }
@@ -391,7 +410,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-11h";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12a";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
