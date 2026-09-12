@@ -98,14 +98,19 @@
   /* A base reads as a floor plan: walls as lines, floors a tint, roofs barely
      there, furniture solid. Every storey of a build lands on the same footprint,
      so opaque fills stacked to a slab. */
-  #pieces rect{vector-effect:non-scaling-stroke;shape-rendering:auto}
+  #pieces rect{vector-effect:non-scaling-stroke;shape-rendering:auto;fill:var(--c)}
   #pieces rect[data-kind=floor]{fill-opacity:.30;stroke:rgba(40,28,16,.30);stroke-width:1}
   #pieces rect[data-kind=roof]{fill-opacity:.10;stroke:none}
   #pieces rect[data-kind=wall]{fill:none;stroke:rgba(38,26,14,.55);stroke-width:1.2}
   #pieces rect[data-kind=pole]{fill-opacity:.8;stroke:none}
   #pieces rect[data-kind=prop]{fill-opacity:.9;stroke:rgba(0,0,0,.5);stroke-width:1}
   #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
-  .far #pieces rect{fill:none;stroke:rgba(255,186,110,.95);stroke-width:2}
+  /* Zoomed out a base is a few pixels across: a thin warm rim marks it, and the
+     roofs and floors fill solid so it reads as a building rather than a ring. */
+  .far #pieces rect{fill:none;stroke:rgba(255,140,50,.9);stroke-width:1.5}
+  .far #pieces rect[data-kind=roof]{fill:var(--c);fill-opacity:1;stroke:none}
+  .far #pieces rect[data-kind=floor]{fill:var(--c);fill-opacity:.7;stroke:none}
+  .far #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.portal .nm{color:#9fe8f2}
@@ -400,11 +405,24 @@ function explored(px, py){
 // Each piece is a rect centred on its position, sized in texture pixels from its
 // footprint in metres, rotated by its yaw. Every storey of a build lands on the
 // same footprint, so one rect per (kind, position, yaw) is drawn, not one per piece.
+// Drawn floors, walls, furniture, then roofs: up close the roof tint hides nothing,
+// zoomed out the solid roof covers the beams and interior walls beneath it.
+const ORDER = ["floor","wall","pole","prop","crop","roof"];
+// Roofs are lit from the north-west: the slope facing the light goes lighter and
+// the far slope darker, so a gable reads as a roof rather than a flat tile.
+// Ridge pieces are flat and keep the plain colour.
+const LIGHT = 315;
+function shade(hex, yaw){
+  const f = 1 + 0.28*Math.cos((yaw - LIGHT)*Math.PI/180), v = parseInt(hex, 16);
+  const ch = b => Math.min(255, Math.round(((v >> b) & 255)*f)).toString(16).padStart(2, "0");
+  return ch(16) + ch(8) + ch(0);
+}
 function drawPieces(){
   const svg = document.getElementById("pieces");
   if(!svg || !PIECES) return;
   sampleFog();
-  const per = 1/GEOM.pixel, half = GEOM.size/2, seen = new Set(), out = [];
+  const per = 1/GEOM.pixel, half = GEOM.size/2, seen = new Set();
+  const out = Object.fromEntries(ORDER.map(k => [k, []]));
   for(const [k,x,z,yaw] of PIECES.pieces){
     const p = PIECES.prefabs[k]; if(!p) continue;
     const px = x*per+half, py = half-z*per;
@@ -413,9 +431,10 @@ function drawPieces(){
     const key = kind+":"+x.toFixed(1)+":"+z.toFixed(1)+":"+yaw;
     if(seen.has(key)) continue; seen.add(key);
     const w = Math.max(p.w*per, 0.08), d = Math.max(p.d*per, 0.08);
-    out.push(`<rect data-kind="${kind}" x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" fill="#${p.c}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${yaw})"></rect>`);
+    const c = kind === "roof" && !p.n.includes("_top") ? shade(p.c, yaw) : p.c;
+    out[kind].push(`<rect data-kind="${kind}" x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" style="--c:#${c}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${yaw})"></rect>`);
   }
-  svg.innerHTML = out.join("");
+  svg.innerHTML = ORDER.map(k => out[k].join("")).join("");
   const raster = document.getElementById("mapStruct");
   if (raster) raster.style.display = PIECES.count ? "none" : "";
   structGlow();
@@ -613,7 +632,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12o";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12p";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
