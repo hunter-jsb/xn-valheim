@@ -93,6 +93,7 @@
      in DOM order, so unexplored builds stay hidden exactly as the raster was. */
   #pieces{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
   #pieces rect{stroke:rgba(0,0,0,.55);stroke-width:1;vector-effect:non-scaling-stroke;shape-rendering:crispEdges}
+  .far #pieces rect{stroke:rgba(255,186,110,.95);stroke-width:2}
   #portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:3;stroke-dasharray:10 7}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
@@ -285,7 +286,12 @@ function apply(){
 // up close the halo would swallow it, and a dark rim is enough to lift it off the terrain
 function structGlow(){
   const near = scale >= 4;
-  const st = document.getElementById(PIECES ? "pieces" : "mapStruct");
+  // The vector layer must never get a CSS filter: a filter rasterises the element
+  // at its untransformed size, where every piece is sub-pixel, so the result is
+  // empty and scaling it up shows nothing. A stroke is vector and needs no such
+  // care; the "far" class swaps it for a warm one so bases glow at world zoom.
+  document.getElementById("stage").classList.toggle("far", !near);
+  const st = document.getElementById("mapStruct");
   if (st) st.style.filter = near
     ? "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))"
     : "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))";
@@ -548,7 +554,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12k";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12l";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
