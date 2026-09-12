@@ -26,7 +26,7 @@ const ROUTES = {
   "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
   // boats and carts move; freshness comes from nudging the sweep below
-  "/vehicles": { ttl: 3, nudge: true },
+  "/vehicles": { ttl: 3 },        // sweeps are on the mod's timer until it gets a real floor
   "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
   "/pieces":  { ttl: 30 },        // every placed piece as a footprint; changes only as people build
@@ -45,31 +45,6 @@ function cors() {
   h.set("Access-Control-Allow-Origin", "*");
   h.set("Access-Control-Allow-Methods", "GET, OPTIONS");
   return h;
-}
-
-// The mod rebuilds vehicle positions only when its world sweep runs, every two
-// minutes, and that sweep walks ~370k ZDOs on the same CPU as the game -- so it
-// is not something to simply run more often. Instead a request for /vehicles
-// asks for one, at most once per NUDGE_SECONDS, so sweeps happen while someone
-// is actually watching the map and not at all when nobody is.
-//
-// Only a real page view asks: the nudge is gated on the site's own Origin, so a
-// scraper or a bare curl reads whatever is current and never costs a sweep.
-//
-// The rate limit is the edge cache holding the refresh response itself -- the
-// same mechanism the routes above use, rather than the Cache API, which is
-// documented as a no-op on workers.dev and would fail open, turning every poll
-// into a sweep. Still per-PoP: viewers on different continents each get their
-// own window. Bounding it globally needs server-side state; this is
-// deliberately the cheap version, and an in-progress sweep refuses a second.
-const NUDGE_SECONDS = 90;
-function nudgeSweep(ctx) {
-  ctx.waitUntil(
-    fetch(UPSTREAM + "/structures/refresh", {
-      cf: { cacheEverything: true,
-            cacheTtlByStatus: { "200-299": NUDGE_SECONDS, "300-399": 0,
-                                "400-499": 0, "500-599": 0 } },
-    }).catch(() => {}));                     // a missed nudge just means stale data
 }
 
 export default {
@@ -92,9 +67,6 @@ export default {
       return new Response("not found", { status: 404, headers: cors() });
     }
 
-    if (route.nudge && ctx && ALLOWED_ORIGINS.has(request.headers.get("Origin"))) {
-      try { nudgeSweep(ctx); } catch (e) {}
-    }
 
     let upstream;
     try {
