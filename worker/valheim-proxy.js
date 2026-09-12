@@ -29,6 +29,7 @@ const ROUTES = {
   "/vehicles": { ttl: 3, nudge: true },
   "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
+  "/pieces":  { ttl: 30 },        // every placed piece as a footprint; changes only as people build
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a

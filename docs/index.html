@@ -117,6 +117,17 @@
   /* one chip for both ends of the same scale: dense woods through to bare ground */
   .legend .sw2{background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
   .legend .ic{width:26px;text-align:center;font-size:12px;line-height:1}
+  /* The legend is also the layer switch: each row hides what it depicts. */
+  .legend [data-layer]{cursor:pointer;user-select:none}
+  .legend [data-layer].off{opacity:.32;text-decoration:line-through}
+  .legend .hint{grid-column:1/-1;font-size:.66rem;color:var(--muted);opacity:.7;margin-top:.15rem}
+  .no-builds #pieces,.no-builds #mapStruct{display:none}
+  .no-forest #mapForest,.no-forest #mapForest2{display:none}
+  .no-portal .marker.portal,.no-portal #portalLinks{display:none}
+  .no-grave .marker.grave{display:none}
+  .no-pin .marker.pin{display:none}
+  .no-raft .marker[data-kind="raft"],.no-karve .marker[data-kind="karve"],
+  .no-longship .marker[data-kind="longship"],.no-cart .marker[data-kind="cart"]{display:none}
   .mapctl button{width:36px;height:36px;border-radius:.45rem;border:1px solid var(--line);
     background:rgba(18,21,15,.9);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1}
   .mapctl button:hover{border-color:var(--gold);color:var(--gold)}
@@ -178,14 +189,16 @@
     </div>
     <div class="legend">
       <h3>Legend</h3>
-      <span class="sw" style="background:#966c42"></span><span>player builds</span>
-      <span class="sw sw2"></span><span>woodland → cleared</span>
-      <span class="ic">🛶</span><span>raft</span>
-      <span class="ic">⛵</span><span>karve</span>
-      <span class="ic">🚢</span><span>longship</span>
-      <span class="ic">🛒</span><span>cart</span>
-      <span class="ic">🌀</span><span>portal, linked by a dashed line</span>
-      <span class="ic">🪦</span><span>grave — gear still there</span>
+      <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">player builds</span>
+      <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">woodland → cleared</span>
+      <span class="ic" data-layer="raft">🛶</span><span data-layer="raft">raft</span>
+      <span class="ic" data-layer="karve">⛵</span><span data-layer="karve">karve</span>
+      <span class="ic" data-layer="longship">🚢</span><span data-layer="longship">longship</span>
+      <span class="ic" data-layer="cart">🛒</span><span data-layer="cart">cart</span>
+      <span class="ic" data-layer="portal">🌀</span><span data-layer="portal">portal, linked by a dashed line</span>
+      <span class="ic" data-layer="grave">🪦</span><span data-layer="grave">grave — gear still there</span>
+      <span class="ic" data-layer="pin">●</span><span data-layer="pin">pins</span>
+      <span class="hint">click an entry to hide it</span>
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
@@ -242,6 +255,10 @@
         <span>🕳️ cave</span>
       </div>
     </div>
+
+    <h3>Layers</h3>
+    <p>Click an entry in the sidebar legend to hide that layer — builds, woodland, boats,
+       portals, graves or pins. It stays hidden in this browser until you click it again.</p>
 
     <h3>Show yourself on the map</h3>
     <p>Press <b>M</b> in game and turn on <b>visible to other players</b>. Without it you
@@ -306,7 +323,7 @@ function buildMarkers(players, pinList, vehicles){
   // Hull size is drawn to scale so a longship reads as one without a label.
   const v = (vehicles||[]).map(m => {
     const st = vehicleStyle(m);
-    return `<div class="marker veh" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
+    return `<div class="marker veh" data-kind="${st.label.toLowerCase()}" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
       + `<span class="ic" style="font-size:${st.size}px">${st.icon}</span></div>`;
   });
   // Named, because the name is the whole point of a portal.
@@ -372,6 +389,25 @@ function graveAge(sec){
   const h = sec/3600;
   return h >= 1 ? h.toFixed(0)+"h" : Math.max(1,Math.round(sec/60))+"m";
 }
+
+// Which layers this viewer has switched off. Classes on the stage do the hiding,
+// so markers rebuilt on every tick need no extra bookkeeping.
+const HIDDEN = new Set();
+try{ (JSON.parse(localStorage.getItem("xnv.hidden")||"[]")).forEach(k=>HIDDEN.add(k)); }catch(e){}
+function applyHidden(){
+  const st = document.getElementById("stage");
+  [...st.classList].filter(c=>c.startsWith("no-")).forEach(c=>st.classList.remove(c));
+  HIDDEN.forEach(k=>st.classList.add("no-"+k));
+  document.querySelectorAll(".legend [data-layer]").forEach(el=>el.classList.toggle("off", HIDDEN.has(el.dataset.layer)));
+  try{ localStorage.setItem("xnv.hidden", JSON.stringify([...HIDDEN])); }catch(e){}
+}
+document.querySelector(".legend").addEventListener("click", e=>{
+  const el = e.target.closest("[data-layer]"); if(!el) return;
+  const k = el.dataset.layer;
+  HIDDEN.has(k) ? HIDDEN.delete(k) : HIDDEN.add(k);
+  applyHidden();
+});
+applyHidden();
 
 function clamp(v,a,b){ return Math.min(b,Math.max(a,v)); }
 
@@ -512,7 +548,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12i";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12j";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
