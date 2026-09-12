@@ -464,13 +464,13 @@ function applyHidden(){
   HIDDEN.forEach(k=>st.classList.add("no-"+k));
   document.querySelectorAll(".legend [data-layer]").forEach(el=>el.classList.toggle("off", HIDDEN.has(el.dataset.layer)));
   try{ localStorage.setItem("xnv.hidden", JSON.stringify([...HIDDEN])); }catch(e){}
-  if(typeof drawRaster === "function" && typeof scale === "number") drawRaster();
 }
 document.querySelector(".legend").addEventListener("click", e=>{
   const el = e.target.closest("[data-layer]"); if(!el) return;
   const k = el.dataset.layer;
   HIDDEN.has(k) ? HIDDEN.delete(k) : HIDDEN.add(k);
   applyHidden();
+  drawRaster();          // only ever from a click, long after everything is declared
 });
 applyHidden();
 
@@ -613,7 +613,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12n";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12o";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
