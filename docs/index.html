@@ -486,7 +486,7 @@ let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null =
 let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12g";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12h";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -645,7 +645,7 @@ async function tickSlow(){                 // pins + fog: change rarely
 
 async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
-  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=jpg";
+  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=4k";
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
   structImg.onload  = () => { structImg.style.display = ""; };

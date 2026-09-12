@@ -31,7 +31,9 @@ const ROUTES = {
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
-  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },
+  // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a
+  // new render is reachable the moment the page bumps it -- no route renaming, no purge
+  "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true, versioned: true },
 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
@@ -98,7 +100,7 @@ export default {
       // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat TTL
       // caches errors too, and one fetch during a restart then poisons that edge
       // for the whole TTL -- which reads as "the map is broken for one player".
-      upstream = await fetch(UPSTREAM + (route.upstream || url.pathname), {
+      upstream = await fetch(UPSTREAM + (route.upstream || url.pathname) + (route.versioned ? url.search : ""), {
         method: "GET",
         cf: route.ttl
           ? { cacheEverything: true,
