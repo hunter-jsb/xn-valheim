@@ -548,7 +548,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12j";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12k";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -692,7 +692,7 @@ async function tickSlow(){                 // pins + fog: change rarely
   const sProbe=new Image();
   sProbe.crossOrigin="anonymous";
   sProbe.onload=()=>{ st.src=sProbe.src; };
-  sProbe.src = API+"/structures?"+Date.now();
+  if(!PIECES) sProbe.src = API+"/structures?"+Date.now();   // vectors replace the raster
 
   const fr=document.getElementById("mapForest");
   const fr2=document.getElementById("mapForest2");
@@ -714,7 +714,7 @@ async function boot(){
   document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=4k";
   const structImg = document.getElementById("mapStruct");
   structImg.style.display = "none";
-  structImg.onload  = () => { structImg.style.display = ""; };
+  structImg.onload  = () => { structImg.style.display = PIECES ? "none" : ""; };
   structImg.onerror = () => { structImg.style.display = "none"; };
   structImg.src = API+"/structures";
   const forestImg = document.getElementById("mapForest");
