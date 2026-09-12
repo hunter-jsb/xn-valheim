@@ -27,6 +27,7 @@ const ROUTES = {
   "/structures/stats": { ttl: 10 },
   // boats and carts move; freshness comes from nudging the sweep below
   "/vehicles": { ttl: 3, nudge: true },
+  "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true },

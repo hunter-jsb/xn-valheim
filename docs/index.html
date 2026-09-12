@@ -86,6 +86,12 @@
   .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
     background:#000;isolation:isolate;will-change:transform}
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
+  /* Links live inside mapinner in texture coordinates, so they pan and zoom with
+     the map for free instead of being repositioned on every frame. */
+  #portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:3;stroke-dasharray:10 7}
+  .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
+  .marker.portal .nm{color:#9fe8f2}
   /* The forest layer is drawn twice, multiplied both times, which squares its
      effect: dense woods go markedly darker while a thinned patch barely changes,
      so the difference between them reads at a glance. One layer alone was too
@@ -171,6 +177,7 @@
       <span class="ic">⛵</span><span>karve</span>
       <span class="ic">🚢</span><span>longship</span>
       <span class="ic">🛒</span><span>cart</span>
+      <span class="ic">🌀</span><span>portal, linked by a dashed line</span>
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
@@ -187,6 +194,7 @@
       <img id="mapForest2" crossorigin="anonymous" alt="">
       <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
+      <svg id="portalLinks" viewBox="0 0 2048 2048" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
     <div class="markers" id="markers"></div>
     <div class="mapui">
@@ -292,9 +300,35 @@ function buildMarkers(players, pinList, vehicles){
     return `<div class="marker veh" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
       + `<span class="ic" style="font-size:${st.size}px">${st.icon}</span></div>`;
   });
-  document.getElementById("markers").innerHTML = p.concat(q).concat(v).join("");
+  // Named, because the name is the whole point of a portal.
+  const w = (PORTALS||[]).map(m =>
+    `<div class="marker portal" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"unnamed portal")}">`
+    + `<span class="ic">\uD83C\uDF00</span>`
+    + (m.name ? `<span class="nm">${esc(m.name)}</span>` : "") + `</div>`);
+  document.getElementById("markers").innerHTML = p.concat(q).concat(v).concat(w).join("");
+  drawPortalLinks();
   positionMarkers();
 }
+// One line per connected pair, drawn once from each end's own record, so a pair
+// whose far side sits in unexplored ground simply has no line.
+function drawPortalLinks(){
+  const svg = document.getElementById("portalLinks");
+  if(!svg) return;
+  const by = new Map((PORTALS||[]).map(p=>[p.id,p]));
+  const seen = new Set();
+  let out = "";
+  for(const p of PORTALS||[]){
+    if(!p.to) continue;
+    const q = by.get(p.to);
+    if(!q) continue;
+    const key = p.id < p.to ? p.id+"|"+p.to : p.to+"|"+p.id;
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out += `<line x1="${p.px}" y1="${p.py}" x2="${q.px}" y2="${q.py}"></line>`;
+  }
+  svg.innerHTML = out;
+}
+
 function clamp(v,a,b){ return Math.min(b,Math.max(a,v)); }
 
 function computeFit(){
@@ -430,8 +464,9 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 // forgotten tab costs nothing.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
+let PORTALS = [];         // portals and the links between connected pairs
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12e";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12f";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -553,6 +588,11 @@ async function tickSlow(){                 // pins + fog: change rarely
       if(!isFinite(x)||!isFinite(z)) return null;
       return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
     }).filter(Boolean);
+    renderTiles();
+  }catch(e){}
+  try{
+    const pj = await api("/portals").then(r=>r.json());
+    PORTALS = (pj.portals||[]).map(p=>({id:p.id, name:p.name, to:p.to, ...toPx(p.x,p.z)}));
     renderTiles();
   }catch(e){}
   try{ FOREST = await api("/forest/stats").then(r=>r.json()); }catch(e){}
