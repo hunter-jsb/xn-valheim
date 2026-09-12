@@ -99,10 +99,11 @@
     grid-template-columns:auto 1fr;align-items:center}
   .legend h3{grid-column:1/-1;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;
     color:var(--muted);font-weight:600;margin:0 0 .1rem}
-  .legend .sw{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.7)}
+  /* the widest chip sets the column, so everything in it is that wide and centred */
+  .legend .sw{width:26px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.7)}
   /* one chip for both ends of the same scale: dense woods through to bare ground */
-  .legend .sw2{width:26px;background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
-  .legend .ic{width:13px;text-align:center;font-size:12px;line-height:1}
+  .legend .sw2{background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
+  .legend .ic{width:26px;text-align:center;font-size:12px;line-height:1}
   .mapctl button{width:36px;height:36px;border-radius:.45rem;border:1px solid var(--line);
     background:rgba(18,21,15,.9);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1}
   .mapctl button:hover{border-color:var(--gold);color:var(--gold)}
@@ -430,7 +431,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12d";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12e";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
