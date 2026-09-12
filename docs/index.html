@@ -86,16 +86,25 @@
   .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
     background:#000;isolation:isolate;will-change:transform}
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
-  /* Links live inside mapinner in texture coordinates, so they pan and zoom with
-     the map for free instead of being repositioned on every frame. */
-  /* Builds as vectors: one rect per placed piece, in texture coordinates, so a
-     base is a layout at any zoom instead of a smear of pixels. Under the fog img
-     in DOM order, so unexplored builds stay hidden exactly as the raster was. */
-  #pieces{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-  #pieces rect{stroke:rgba(0,0,0,.55);stroke-width:1;vector-effect:non-scaling-stroke;shape-rendering:crispEdges}
-  .far #pieces rect{stroke:rgba(255,186,110,.95);stroke-width:2}
-  #portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-  #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:3;stroke-dasharray:10 7}
+  /* Vector overlays live in screen space with a viewBox that follows the view,
+     not under the map's CSS transform: Chrome caps how finely it rasterises a
+     2048px layer, so anything vector under that transform came out as smeared
+     blobs at high zoom. Here they are rasterised at 1:1 every frame and are crisp
+     at any zoom. Stacking order no longer hides them under the fog, so pieces are
+     filtered against the fog before they are drawn. */
+  #pieces,#portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:4}
+  /* A base reads as a floor plan: walls as lines, floors a tint, roofs barely
+     there, furniture solid. Every storey of a build lands on the same footprint,
+     so opaque fills stacked to a slab. */
+  #pieces rect{vector-effect:non-scaling-stroke;shape-rendering:auto}
+  #pieces rect[data-kind=floor]{fill-opacity:.30;stroke:rgba(40,28,16,.30);stroke-width:1}
+  #pieces rect[data-kind=roof]{fill-opacity:.10;stroke:none}
+  #pieces rect[data-kind=wall]{fill:none;stroke:rgba(38,26,14,.55);stroke-width:1.2}
+  #pieces rect[data-kind=pole]{fill-opacity:.8;stroke:none}
+  #pieces rect[data-kind=prop]{fill-opacity:.9;stroke:rgba(0,0,0,.5);stroke-width:1}
+  #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
+  .far #pieces rect{fill:none;stroke:rgba(255,186,110,.95);stroke-width:2}
+  #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.portal .nm{color:#9fe8f2}
   .marker.grave .ic{font-size:12px;line-height:1;opacity:.9;filter:drop-shadow(0 1px 2px #000)}
@@ -214,11 +223,11 @@
       <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
       <img id="mapForest" crossorigin="anonymous" alt="forest cover and logging">
       <img id="mapForest2" crossorigin="anonymous" alt="">
-      <svg id="pieces" viewBox="0 0 2048 2048" preserveAspectRatio="none" aria-hidden="true"></svg>
       <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
-      <svg id="portalLinks" viewBox="0 0 2048 2048" preserveAspectRatio="none" aria-hidden="true"></svg>
     </div>
+    <svg id="pieces" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <svg id="portalLinks" preserveAspectRatio="none" aria-hidden="true"></svg>
     <div class="markers" id="markers"></div>
     <div class="mapui">
       <div class="mapctl">
@@ -279,6 +288,9 @@ let scale = 1, tx = 0, ty = 0, fit = 1;
 
 function apply(){
   inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  // the vector layers see the same window, in texture coordinates
+  const vb = `${(-tx/scale).toFixed(3)} ${(-ty/scale).toFixed(3)} ${(stage.clientWidth/scale).toFixed(3)} ${(stage.clientHeight/scale).toFixed(3)}`;
+  for(const id of ["pieces","portalLinks"]){ const el=document.getElementById(id); if(el) el.setAttribute("viewBox", vb); }
   structGlow();
   positionMarkers();
 }
@@ -346,24 +358,56 @@ function buildMarkers(players, pinList, vehicles){
   drawPortalLinks();
   positionMarkers();
 }
-// Each piece is a rect centred on its position, sized in texture pixels from
-// its footprint in metres, and rotated by its yaw. A non-scaling 1px stroke
-// keeps a wall visible as a line at zooms where its 0.3 m would vanish.
+// The same rules the server uses for footprints, applied to how a piece is drawn.
+const kindOf = n => { n = n.toLowerCase();
+  return n.includes("sapling") ? "crop" : n.includes("roof") ? "roof" : n.includes("floor") ? "floor"
+       : /wall|fence|gate|beam|stake/.test(n) ? "wall" : n.includes("pole") ? "pole" : "prop"; };
+
+// A coarse copy of the fog, refreshed each time pieces are drawn, so a build in
+// unexplored ground is dropped before drawing. Until the fog has loaded, nothing
+// is dropped rather than everything.
+const FOGN = 512; let fogData = null;
+function sampleFog(){
+  const img = document.getElementById("mapFog");
+  if(!img || !img.complete || !img.naturalWidth){ fogData = null; return; }
+  try{
+    const c = document.createElement("canvas"); c.width = c.height = FOGN;
+    const g = c.getContext("2d", {willReadFrequently:true});
+    g.drawImage(img, 0, 0, FOGN, FOGN);
+    fogData = g.getImageData(0, 0, FOGN, FOGN).data;
+  }catch(e){ fogData = null; }
+}
+function explored(px, py){
+  if(!fogData) return true;
+  const k = FOGN/GEOM.size;
+  const x = Math.min(FOGN-1, Math.max(0, (px*k)|0)), y = Math.min(FOGN-1, Math.max(0, (py*k)|0));
+  return fogData[(y*FOGN+x)*4] > 40;
+}
+
+// Each piece is a rect centred on its position, sized in texture pixels from its
+// footprint in metres, rotated by its yaw. Every storey of a build lands on the
+// same footprint, so one rect per (kind, position, yaw) is drawn, not one per piece.
 function drawPieces(){
   const svg = document.getElementById("pieces");
   if(!svg || !PIECES) return;
-  const per = 1/GEOM.pixel, half = GEOM.size/2;
-  const out = [];
+  sampleFog();
+  const per = 1/GEOM.pixel, half = GEOM.size/2, seen = new Set(), out = [];
   for(const [k,x,z,yaw] of PIECES.pieces){
     const p = PIECES.prefabs[k]; if(!p) continue;
+    const px = x*per+half, py = half-z*per;
+    if(!explored(px, py)) continue;
+    const kind = kindOf(p.n);
+    const key = kind+":"+x.toFixed(1)+":"+z.toFixed(1)+":"+yaw;
+    if(seen.has(key)) continue; seen.add(key);
     const w = Math.max(p.w*per, 0.08), d = Math.max(p.d*per, 0.08);
-    out.push(`<rect x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" fill="#${p.c}" transform="translate(${(x*per+half).toFixed(2)} ${(half-z*per).toFixed(2)}) rotate(${yaw})"><title>${esc(p.n)}</title></rect>`);
+    out.push(`<rect data-kind="${kind}" x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" fill="#${p.c}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${yaw})"></rect>`);
   }
   svg.innerHTML = out.join("");
   const raster = document.getElementById("mapStruct");
   if (raster) raster.style.display = PIECES.count ? "none" : "";
   structGlow();
 }
+document.getElementById("mapFog").addEventListener("load", () => { if(PIECES) drawPieces(); });
 
 // One line per connected pair, drawn once from each end's own record, so a pair
 // whose far side sits in unexplored ground simply has no line.
@@ -398,8 +442,9 @@ function graveAge(sec){
 
 // Which layers this viewer has switched off. Classes on the stage do the hiding,
 // so markers rebuilt on every tick need no extra bookkeeping.
-const HIDDEN = new Set();
-try{ (JSON.parse(localStorage.getItem("xnv.hidden")||"[]")).forEach(k=>HIDDEN.add(k)); }catch(e){}
+const HIDDEN = new Set(["portal"]);      // portals sit on top of the builds they are in: off by default
+try{ const saved = localStorage.getItem("xnv.hidden");
+     if(saved !== null){ HIDDEN.clear(); JSON.parse(saved).forEach(k=>HIDDEN.add(k)); } }catch(e){}
 function applyHidden(){
   const st = document.getElementById("stage");
   [...st.classList].filter(c=>c.startsWith("no-")).forEach(c=>st.classList.remove(c));
@@ -554,7 +599,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12l";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12m";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
