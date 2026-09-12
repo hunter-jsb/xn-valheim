@@ -107,12 +107,13 @@
   #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
   /* Zoomed out a base is what the sky sees: its roofs. Each roof piece is fattened
      by a stroke in its own lit or shadowed tone, so a base stays a mark at world
-     zoom without a halo colour of its own; walls thin to the faint lines of the plan. */
-  .far #pieces rect{fill:var(--c);fill-opacity:.9;stroke:none}
-  .far #pieces rect[data-kind=wall]{fill:none;stroke:rgba(30,20,10,.45);stroke-width:1}
-  .far #pieces rect[data-kind=roof]{fill-opacity:1;stroke:var(--c);stroke-width:1.5}
-  .far #pieces rect[data-kind=floor]{fill-opacity:.7}
-  .far #pieces rect[data-kind=crop]{fill:#7fb35a}
+     zoom without a halo colour of its own; walls thin to the faint lines of the plan.
+     Hiding the "floor plan up close" legend row keeps this roof view at every zoom. */
+  :is(.far,.no-plan) #pieces rect{fill:var(--c);fill-opacity:.9;stroke:none}
+  :is(.far,.no-plan) #pieces rect[data-kind=wall]{fill:none;stroke:rgba(30,20,10,.45);stroke-width:1}
+  :is(.far,.no-plan) #pieces rect[data-kind=roof]{fill-opacity:1;stroke:var(--c);stroke-width:1.5}
+  :is(.far,.no-plan) #pieces rect[data-kind=floor]{fill-opacity:.7}
+  :is(.far,.no-plan) #pieces rect[data-kind=crop]{fill:#7fb35a}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.portal .nm{color:#9fe8f2}
@@ -206,6 +207,7 @@
     <div class="legend">
       <h3>Legend</h3>
       <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">player builds</span>
+      <span class="ic" data-layer="plan">▦</span><span data-layer="plan">floor plan up close</span>
       <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">woodland → cleared</span>
       <span class="ic" data-layer="raft">🛶</span><span data-layer="raft">raft</span>
       <span class="ic" data-layer="karve">⛵</span><span data-layer="karve">karve</span>
@@ -274,7 +276,9 @@
 
     <h3>Layers</h3>
     <p>Click an entry in the sidebar legend to hide that layer — builds, woodland, boats,
-       portals, graves or pins. It stays hidden in this browser until you click it again.</p>
+       portals, graves or pins. It stays hidden in this browser until you click it again.
+       Zoomed in, builds are drawn as a floor plan; hide <b>floor plan up close</b> to keep
+       the shaded roofs at every zoom instead.</p>
 
     <h3>Show yourself on the map</h3>
     <p>Press <b>M</b> in game and turn on <b>visible to other players</b>. Without it you
@@ -634,7 +638,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12q";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12r";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
