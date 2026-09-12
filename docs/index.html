@@ -88,6 +88,11 @@
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
   /* Links live inside mapinner in texture coordinates, so they pan and zoom with
      the map for free instead of being repositioned on every frame. */
+  /* Builds as vectors: one rect per placed piece, in texture coordinates, so a
+     base is a layout at any zoom instead of a smear of pixels. Under the fog img
+     in DOM order, so unexplored builds stay hidden exactly as the raster was. */
+  #pieces{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  #pieces rect{stroke:rgba(0,0,0,.55);stroke-width:1;vector-effect:non-scaling-stroke;shape-rendering:crispEdges}
   #portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:3;stroke-dasharray:10 7}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
@@ -195,6 +200,7 @@
       <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
       <img id="mapForest" crossorigin="anonymous" alt="forest cover and logging">
       <img id="mapForest2" crossorigin="anonymous" alt="">
+      <svg id="pieces" viewBox="0 0 2048 2048" preserveAspectRatio="none" aria-hidden="true"></svg>
       <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
       <svg id="portalLinks" viewBox="0 0 2048 2048" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -262,7 +268,7 @@ function apply(){
 // up close the halo would swallow it, and a dark rim is enough to lift it off the terrain
 function structGlow(){
   const near = scale >= 4;
-  const st = document.getElementById("mapStruct");
+  const st = document.getElementById(PIECES ? "pieces" : "mapStruct");
   if (st) st.style.filter = near
     ? "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))"
     : "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))";
@@ -317,6 +323,25 @@ function buildMarkers(players, pinList, vehicles){
   drawPortalLinks();
   positionMarkers();
 }
+// Each piece is a rect centred on its position, sized in texture pixels from
+// its footprint in metres, and rotated by its yaw. A non-scaling 1px stroke
+// keeps a wall visible as a line at zooms where its 0.3 m would vanish.
+function drawPieces(){
+  const svg = document.getElementById("pieces");
+  if(!svg || !PIECES) return;
+  const per = 1/GEOM.pixel, half = GEOM.size/2;
+  const out = [];
+  for(const [k,x,z,yaw] of PIECES.pieces){
+    const p = PIECES.prefabs[k]; if(!p) continue;
+    const w = Math.max(p.w*per, 0.08), d = Math.max(p.d*per, 0.08);
+    out.push(`<rect x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" fill="#${p.c}" transform="translate(${(x*per+half).toFixed(2)} ${(half-z*per).toFixed(2)}) rotate(${yaw})"><title>${esc(p.n)}</title></rect>`);
+  }
+  svg.innerHTML = out.join("");
+  const raster = document.getElementById("mapStruct");
+  if (raster) raster.style.display = PIECES.count ? "none" : "";
+  structGlow();
+}
+
 // One line per connected pair, drawn once from each end's own record, so a pair
 // whose far side sits in unexplored ground simply has no line.
 function drawPortalLinks(){
@@ -364,7 +389,7 @@ function fitView(){          // whole world
 function fitBox(bx,by,bw,bh){
   computeFit();
   const w = stage.clientWidth, h = stage.clientHeight, pad = 1.6;
-  scale = clamp(Math.min(w/(bw*pad), h/(bh*pad)), fit, 12);
+  scale = clamp(Math.min(w/(bw*pad), h/(bh*pad)), fit, 40);
   tx = w/2 - (bx + bw/2) * scale;
   ty = h/2 - (by + bh/2) * scale;
   apply();
@@ -395,7 +420,7 @@ function fitExplored(doFit = true){
 }
 
 function zoomAt(cx, cy, factor){
-  const ns = clamp(scale*factor, fit*0.5, 12);
+  const ns = clamp(scale*factor, fit*0.5, 40);
   tx = cx - (cx - tx) * (ns/scale);
   ty = cy - (cy - ty) * (ns/scale);
   scale = ns; apply();
@@ -485,8 +510,9 @@ const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
+let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12h";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12i";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -619,6 +645,10 @@ async function tickSlow(){                 // pins + fog: change rarely
     const gj = await api("/graves").then(r=>r.json());
     GRAVES = (gj.graves||[]).map(g=>({name:g.name, age:g.age, ...toPx(g.x,g.z)}));
     renderTiles();
+  }catch(e){}
+  try{
+    const pj = await api("/pieces").then(r=>r.json());
+    if(pj && pj.pieces){ PIECES = pj; drawPieces(); }
   }catch(e){}
   try{ FOREST = await api("/forest/stats").then(r=>r.json()); }catch(e){}
   renderTiles();
