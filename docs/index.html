@@ -118,6 +118,12 @@
   .cmds code{font-family:"Cascadia Code",Consolas,monospace;color:var(--gold);white-space:nowrap;display:block}
   .cmds span{color:var(--muted);display:block;margin-top:.1rem}
   @media (max-width:520px){ .cmds{grid-template-columns:1fr} }
+  /* the types are not a command -- styling them like one made people try to type it */
+  .pintypes{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .9rem;
+            border-top:1px solid var(--line);padding-top:.7rem;margin-top:.1rem;font-size:.8rem}
+  .pintypes b{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.07em;
+              font-size:.7rem;margin-right:.2rem}
+  .pintypes span{color:#fff}
   .types b{color:var(--ink);font-weight:600}
   @media (max-width:760px){
     .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.6)}
@@ -202,7 +208,15 @@
       <div><code>!pin &lt;type&gt; &lt;text&gt;</code><span>a typed pin, e.g. <code>!pin house Base</code></span></div>
       <div><code>!undoPin</code><span>remove your most recent pin</span></div>
       <div><code>!deletePin &lt;text&gt;</code><span>remove the pin matching that text</span></div>
-      <div><code>types</code><span>dot · fire · mine · house · cave</span></div>
+      <div><code>!deletePin</code><span>with no text, removes your most recent <em>unnamed</em> pin</span></div>
+      <div class="pintypes">
+        <b>Types</b>
+        <span>● dot</span>
+        <span>🔥 fire</span>
+        <span>⛏️ mine</span>
+        <span>🏠 house</span>
+        <span>🕳️ cave</span>
+      </div>
     </div>
 
     <h3>Show yourself on the map</h3>
@@ -410,7 +424,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12a";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12b";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
