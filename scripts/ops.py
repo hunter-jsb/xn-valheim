@@ -104,6 +104,53 @@ def announce(text: str) -> bool:
     return False
 
 
+def players_online() -> list[str]:
+    """Names of players currently connected, straight from the mod."""
+    try:
+        with urllib.request.urlopen(f"{WEBMAP_URL}/players", timeout=10) as r:
+            return [p.get("name", "?") for p in json.load(r).get("players", [])]
+    except Exception:
+        return []
+
+
+def drain(timeout: int, reason: str) -> None:
+    """Ask everyone to log out, and wait until they have.
+
+    Valheim keeps each player's inventory in their own character file on their
+    own machine, not in the world. Cutting the server out from under a connected
+    client leaves the two saves disagreeing: an item that moved from inventory
+    into a chest survives in both, and one that moved the other way -- or an
+    upgrade applied at a bench -- is simply gone. A clean logout writes the
+    character file first, which is the only thing that prevents it.
+    """
+    why = f" - {reason}" if reason else ""
+    mins = max(1, timeout // 60)
+    announce(f"Restart in ~{mins} min{why}. Please LOG OUT to save your gear "
+             f"- items can be lost if you are still connected.")
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        who = players_online()
+        if not who:
+            print("server drained; everyone logged out")
+            announce("Everyone is out - restarting now.")
+            time.sleep(2)
+            return
+        if who != last:
+            print(f"  waiting on {len(who)}: {', '.join(who)}")
+            last = who
+        left = int(deadline - time.time())
+        if left in (60, 30, 10):
+            announce(f"Restart in {left}s - log out now to save your gear.")
+        time.sleep(5)
+    who = players_online()
+    if who:
+        print(f"still connected after {timeout}s: {', '.join(who)}; restarting anyway",
+              file=sys.stderr)
+        announce("Restarting now - log back in shortly.")
+        time.sleep(2)
+
+
 def _client() -> IBClient:
     c = IBClient()
     if not c.session_ok():
@@ -121,6 +168,10 @@ def main():
     ap.add_argument("--warn", type=int, metavar="SECONDS",
                     help="restart: shout a countdown in game first")
     ap.add_argument("--reason", default="", help="restart: why, for the shout")
+    ap.add_argument("--drain", type=int, nargs="?", const=300, metavar="SECONDS",
+                    help="restart: ask players to log out and wait for them "
+                         "(default 300s) before restarting. Prefer this to --warn "
+                         "whenever anyone is online -- see drain().")
     a = ap.parse_args()
 
     c = _client()
@@ -137,7 +188,9 @@ def main():
             sys.exit("usage: ops.py announce '<message>'")
         sys.exit(0 if announce(a.arg) else 1)
     elif a.cmd in ("start", "stop", "restart"):
-        if a.warn and a.cmd in ("restart", "stop"):
+        if a.drain and a.cmd in ("restart", "stop"):
+            drain(a.drain, a.reason)
+        elif a.warn and a.cmd in ("restart", "stop"):
             why = f" - {a.reason}" if a.reason else ""
             announce(f"Restarting in {a.warn}s{why}")
             # a second shout near the moment catches anyone who just logged in
