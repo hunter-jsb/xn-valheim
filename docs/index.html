@@ -72,7 +72,7 @@
     border:2px solid #0a0c0a;box-shadow:0 0 9px rgba(111,175,104,.85)}
   .marker .nm{font-size:.66rem;color:#fff;background:rgba(10,12,10,.8);padding:1px 5px;
     border-radius:.3rem;white-space:nowrap}
-  .mapinner.ready{visibility:visible}
+  #mapCanvas.ready{visibility:visible}
   .marker.pin .ic{font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.pin .nm{color:var(--gold)}
   /* parked kit, not people: visible on a look but never competing with players */
@@ -83,9 +83,11 @@
   /* ---------- map stage ---------- */
   .stage{flex:1;position:relative;overflow:hidden;background:#0a0c0a;cursor:grab;touch-action:none}
   .stage.dragging{cursor:grabbing}
-  .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
-    background:#000;isolation:isolate;will-change:transform}
-  .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
+  /* The rasters are blitted into one screen-space canvas per view change,
+     only the visible window, nearest-neighbour once zoomed in. Under a CSS
+     transform Chrome GPU-scales a 1:1 raster with bilinear filtering, and
+     image-rendering cannot reach that path: 6 m pixels came out as a smear. */
+  #mapCanvas{position:absolute;inset:0;width:100%;height:100%;background:#000;visibility:hidden;user-select:none}
   /* Vector overlays live in screen space with a viewBox that follows the view,
      not under the map's CSS transform: Chrome caps how finely it rasterises a
      2048px layer, so anything vector under that transform came out as smeared
@@ -113,8 +115,6 @@
      effect: dense woods go markedly darker while a thinned patch barely changes,
      so the difference between them reads at a glance. One layer alone was too
      faint over meadow, which is green already. Same URL, so it is one fetch. */
-  #mapForest,#mapForest2{mix-blend-mode:multiply}
-  #mapFog{mix-blend-mode:multiply}
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
   .mapctl{display:flex;flex-direction:column;gap:.35rem}
   .legend{margin-top:1rem;border-top:1px solid var(--line);padding-top:.8rem;
@@ -131,8 +131,7 @@
   .legend [data-layer]{cursor:pointer;user-select:none}
   .legend [data-layer].off{opacity:.32;text-decoration:line-through}
   .legend .hint{grid-column:1/-1;font-size:.66rem;color:var(--muted);opacity:.7;margin-top:.15rem}
-  .no-builds #pieces,.no-builds #mapStruct{display:none}
-  .no-forest #mapForest,.no-forest #mapForest2{display:none}
+  .no-builds #pieces{display:none}
   .no-portal .marker.portal,.no-portal #portalLinks{display:none}
   .no-grave .marker.grave{display:none}
   .no-pin .marker.pin{display:none}
@@ -219,12 +218,12 @@
   </aside>
 
   <div class="stage" id="stage">
-    <div class="mapinner" id="mapinner">
-      <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
-      <img id="mapForest" crossorigin="anonymous" alt="forest cover and logging">
-      <img id="mapForest2" crossorigin="anonymous" alt="">
-      <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
-      <img id="mapFog" crossorigin="anonymous" alt="explored areas">
+    <canvas id="mapCanvas" aria-label="Valheim world map"></canvas>
+    <div id="sources" hidden>
+      <img id="mapBase" crossorigin="anonymous" alt="">
+      <img id="mapForest" crossorigin="anonymous" alt="">
+      <img id="mapStruct" crossorigin="anonymous" alt="">
+      <img id="mapFog" crossorigin="anonymous" alt="">
     </div>
     <svg id="pieces" preserveAspectRatio="none" aria-hidden="true"></svg>
     <svg id="portalLinks" preserveAspectRatio="none" aria-hidden="true"></svg>
@@ -283,11 +282,34 @@
 <script>
 const SIZE = 2048;
 const stage = document.getElementById("stage");
-const inner = document.getElementById("mapinner");
+const inner = document.getElementById("mapCanvas");
+const rctx = inner.getContext("2d");
 let scale = 1, tx = 0, ty = 0, fit = 1;
 
+// Blit the visible window of each raster: base, forest twice (multiply, for
+// prominence), the structures raster only until the vectors arrive, fog last.
+// Nearest-neighbour for the base once its pixels are bigger than screen pixels.
+function drawRaster(){
+  const W = stage.clientWidth, H = stage.clientHeight;
+  if(inner.width !== W || inner.height !== H){ inner.width = W; inner.height = H; }
+  rctx.globalCompositeOperation = "source-over";
+  rctx.fillStyle = "#000"; rctx.fillRect(0, 0, W, H);
+  const sx = -tx/scale, sy = -ty/scale, sw = W/scale, sh = H/scale;
+  const blit = (id, smooth, op) => {
+    const img = document.getElementById(id);
+    if(!img || !img.complete || !img.naturalWidth) return;
+    const k = img.naturalWidth / GEOM.size;          // source px per texture px
+    rctx.imageSmoothingEnabled = smooth;
+    rctx.globalCompositeOperation = op;
+    try{ rctx.drawImage(img, sx*k, sy*k, sw*k, sh*k, 0, 0, W, H); }catch(e){}
+  };
+  blit("mapBase", scale < 3, "source-over");
+  if(!HIDDEN.has("forest")){ blit("mapForest", true, "multiply"); blit("mapForest", true, "multiply"); }
+  if(!HIDDEN.has("builds") && !PIECES) blit("mapStruct", true, "source-over");
+  blit("mapFog", true, "multiply");
+}
 function apply(){
-  inner.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  drawRaster();
   // the vector layers see the same window, in texture coordinates
   const vb = `${(-tx/scale).toFixed(3)} ${(-ty/scale).toFixed(3)} ${(stage.clientWidth/scale).toFixed(3)} ${(stage.clientHeight/scale).toFixed(3)}`;
   for(const id of ["pieces","portalLinks"]){ const el=document.getElementById(id); if(el) el.setAttribute("viewBox", vb); }
@@ -296,17 +318,8 @@ function apply(){
 }
 // a base is ~10 map pixels across, so zoomed out it needs a halo to be a mark at all;
 // up close the halo would swallow it, and a dark rim is enough to lift it off the terrain
-function structGlow(){
-  const near = scale >= 4;
-  // The vector layer must never get a CSS filter: a filter rasterises the element
-  // at its untransformed size, where every piece is sub-pixel, so the result is
-  // empty and scaling it up shows nothing. A stroke is vector and needs no such
-  // care; the "far" class swaps it for a warm one so bases glow at world zoom.
-  document.getElementById("stage").classList.toggle("far", !near);
-  const st = document.getElementById("mapStruct");
-  if (st) st.style.filter = near
-    ? "drop-shadow(0 0 1px rgba(0,0,0,.95)) drop-shadow(0 0 2.5px rgba(0,0,0,.55))"
-    : "drop-shadow(0 0 3px rgba(255,186,110,.95)) drop-shadow(0 0 7px rgba(255,150,60,.55))";
+function structGlow(){                    // warm outlines at world zoom, plain lines up close
+  document.getElementById("stage").classList.toggle("far", scale < 4);
 }
 function positionMarkers(){
   document.querySelectorAll("#markers .marker").forEach(el => {
@@ -451,6 +464,7 @@ function applyHidden(){
   HIDDEN.forEach(k=>st.classList.add("no-"+k));
   document.querySelectorAll(".legend [data-layer]").forEach(el=>el.classList.toggle("off", HIDDEN.has(el.dataset.layer)));
   try{ localStorage.setItem("xnv.hidden", JSON.stringify([...HIDDEN])); }catch(e){}
+  if(typeof drawRaster === "function" && typeof scale === "number") drawRaster();
 }
 document.querySelector(".legend").addEventListener("click", e=>{
   const el = e.target.closest("[data-layer]"); if(!el) return;
@@ -599,7 +613,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12m";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12n";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -746,11 +760,9 @@ async function tickSlow(){                 // pins + fog: change rarely
   if(!PIECES) sProbe.src = API+"/structures?"+Date.now();   // vectors replace the raster
 
   const fr=document.getElementById("mapForest");
-  const fr2=document.getElementById("mapForest2");
   const fProbe=new Image();
   fProbe.crossOrigin="anonymous";
-  fProbe.onload=()=>{ fr.src=fProbe.src; fr2.src=fProbe.src;
-                      fr.style.display=""; fr2.style.display=""; };
+  fProbe.onload=()=>{ fr.src=fProbe.src; };
   fProbe.src = API+"/forest?"+Date.now();
 
   const fog=document.getElementById("mapFog");
@@ -763,21 +775,11 @@ async function tickSlow(){                 // pins + fog: change rarely
 async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
   document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=4k";
-  const structImg = document.getElementById("mapStruct");
-  structImg.style.display = "none";
-  structImg.onload  = () => { structImg.style.display = PIECES ? "none" : ""; };
-  structImg.onerror = () => { structImg.style.display = "none"; };
-  structImg.src = API+"/structures";
-  const forestImg = document.getElementById("mapForest");
-  const forestImg2 = document.getElementById("mapForest2");
-  forestImg.style.display = "none";
-  forestImg2.style.display = "none";
-  forestImg.onload  = () => { forestImg.style.display = "";
-                              forestImg2.src = forestImg.src;
-                              forestImg2.style.display = ""; };
-  forestImg.onerror = () => { forestImg.style.display = "none";
-                              forestImg2.style.display = "none"; };
-  forestImg.src = API+"/forest";
+  document.getElementById("mapStruct").src = API+"/structures";
+  document.getElementById("mapForest").src = API+"/forest";
+  // any layer arriving or refreshing is a redraw
+  for(const id of ["mapBase","mapForest","mapStruct","mapFog"])
+    document.getElementById(id).addEventListener("load", () => drawRaster());
   try{
     const c = await api("/config").then(r=>r.json());
     GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
