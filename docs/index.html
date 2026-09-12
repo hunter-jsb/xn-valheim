@@ -135,10 +135,12 @@
   /* one chip for both ends of the same scale: dense woods through to bare ground */
   .legend .sw2{background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
   .legend .ic{width:26px;text-align:center;font-size:12px;line-height:1}
+  .legend h3 small{display:block;font-weight:400;text-transform:none;letter-spacing:0;
+    font-size:.66rem;opacity:.75;margin-top:.15rem}
   /* The legend is also the layer switch: each row hides what it depicts. */
   .legend [data-layer]{cursor:pointer;user-select:none}
+  .legend span[data-layer]:not(.sw):not(.ic):hover{color:var(--ink)}
   .legend [data-layer].off{opacity:.32;text-decoration:line-through}
-  .legend .hint{grid-column:1/-1;font-size:.66rem;color:var(--muted);opacity:.7;margin-top:.15rem}
   .no-builds #pieces{display:none}
   .no-portal .marker.portal,.no-portal #portalLinks{display:none}
   .no-grave .marker.grave{display:none}
@@ -205,18 +207,17 @@
       <div id="feed"></div>
     </div>
     <div class="legend">
-      <h3>Legend</h3>
-      <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">player builds</span>
-      <span class="ic" data-layer="plan">▦</span><span data-layer="plan">floor plan up close</span>
-      <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">woodland → cleared</span>
-      <span class="ic" data-layer="raft">🛶</span><span data-layer="raft">raft</span>
-      <span class="ic" data-layer="karve">⛵</span><span data-layer="karve">karve</span>
-      <span class="ic" data-layer="longship">🚢</span><span data-layer="longship">longship</span>
-      <span class="ic" data-layer="cart">🛒</span><span data-layer="cart">cart</span>
-      <span class="ic" data-layer="portal">🌀</span><span data-layer="portal">portal, linked by a dashed line</span>
-      <span class="ic" data-layer="grave">🪦</span><span data-layer="grave">grave — gear still there</span>
+      <h3>Layers <small>click a row to hide or show it</small></h3>
+      <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">forest → cleared</span>
+      <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">builds</span>
+      <span class="ic" data-layer="plan">▦</span><span data-layer="plan">floor plan when close</span>
+      <span class="ic" data-layer="raft">🛶</span><span data-layer="raft">rafts</span>
+      <span class="ic" data-layer="karve">⛵</span><span data-layer="karve">karves</span>
+      <span class="ic" data-layer="longship">🚢</span><span data-layer="longship">longships</span>
+      <span class="ic" data-layer="cart">🛒</span><span data-layer="cart">carts</span>
+      <span class="ic" data-layer="portal">🌀</span><span data-layer="portal">portals</span>
+      <span class="ic" data-layer="grave">🪦</span><span data-layer="grave">graves</span>
       <span class="ic" data-layer="pin">●</span><span data-layer="pin">pins</span>
-      <span class="hint">click an entry to hide it</span>
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
@@ -275,10 +276,11 @@
     </div>
 
     <h3>Layers</h3>
-    <p>Click an entry in the sidebar legend to hide that layer — builds, woodland, boats,
-       portals, graves or pins. It stays hidden in this browser until you click it again.
-       Zoomed in, builds are drawn as a floor plan; hide <b>floor plan up close</b> to keep
-       the shaded roofs at every zoom instead.</p>
+    <p>Every row in the sidebar's <b>Layers</b> list is a switch: click it to hide that
+       layer, click again to bring it back. The choice stays in this browser. Builds are
+       drawn as shaded roofs; only when zoomed right in do they become a floor plan, and
+       hiding <b>floor plan when close</b> keeps the roofs at every zoom. A portal's dashed
+       line leads to the portal it is linked with. A grave marks gear still lying there.</p>
 
     <h3>Show yourself on the map</h3>
     <p>Press <b>M</b> in game and turn on <b>visible to other players</b>. Without it you
@@ -327,10 +329,11 @@ function apply(){
   structGlow();
   positionMarkers();
 }
-// a base is ~10 map pixels across, so zoomed out it needs a halo to be a mark at all;
-// up close the halo would swallow it, and a dark rim is enough to lift it off the terrain
-function structGlow(){                    // warm outlines at world zoom, plain lines up close
-  document.getElementById("stage").classList.toggle("far", scale < 4);
+// Roofs until zoom 16: below that a 2 m piece is under 3 px and a floor plan
+// would be a smudge, so the shaded roofs stay until the plan can actually be read.
+const PLAN_ZOOM = 16;
+function structGlow(){
+  document.getElementById("stage").classList.toggle("far", scale < PLAN_ZOOM);
 }
 function positionMarkers(){
   document.querySelectorAll("#markers .marker").forEach(el => {
@@ -638,7 +641,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12r";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12s";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
