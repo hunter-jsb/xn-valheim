@@ -86,7 +86,11 @@
   .mapinner{position:absolute;top:0;left:0;width:2048px;height:2048px;transform-origin:0 0;visibility:hidden;
     background:#000;isolation:isolate;will-change:transform}
   .mapinner img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;-webkit-user-drag:none}
-  #mapForest{mix-blend-mode:multiply}
+  /* The forest layer is drawn twice, multiplied both times, which squares its
+     effect: dense woods go markedly darker while a thinned patch barely changes,
+     so the difference between them reads at a glance. One layer alone was too
+     faint over meadow, which is green already. Same URL, so it is one fetch. */
+  #mapForest,#mapForest2{mix-blend-mode:multiply}
   #mapFog{mix-blend-mode:multiply}
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
   .mapctl{display:flex;flex-direction:column;gap:.35rem}
@@ -178,6 +182,7 @@
     <div class="mapinner" id="mapinner">
       <img id="mapBase" crossorigin="anonymous" alt="Valheim world map">
       <img id="mapForest" crossorigin="anonymous" alt="forest cover and logging">
+      <img id="mapForest2" crossorigin="anonymous" alt="">
       <img id="mapStruct" crossorigin="anonymous" alt="player-built structures">
       <img id="mapFog" crossorigin="anonymous" alt="explored areas">
     </div>
@@ -424,7 +429,7 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12b";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12c";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -557,9 +562,11 @@ async function tickSlow(){                 // pins + fog: change rarely
   sProbe.src = API+"/structures?"+Date.now();
 
   const fr=document.getElementById("mapForest");
+  const fr2=document.getElementById("mapForest2");
   const fProbe=new Image();
   fProbe.crossOrigin="anonymous";
-  fProbe.onload=()=>{ fr.src=fProbe.src; fr.style.display=""; };
+  fProbe.onload=()=>{ fr.src=fProbe.src; fr2.src=fProbe.src;
+                      fr.style.display=""; fr2.style.display=""; };
   fProbe.src = API+"/forest?"+Date.now();
 
   const fog=document.getElementById("mapFog");
@@ -578,9 +585,14 @@ async function boot(){
   structImg.onerror = () => { structImg.style.display = "none"; };
   structImg.src = API+"/structures";
   const forestImg = document.getElementById("mapForest");
+  const forestImg2 = document.getElementById("mapForest2");
   forestImg.style.display = "none";
-  forestImg.onload  = () => { forestImg.style.display = ""; };
-  forestImg.onerror = () => { forestImg.style.display = "none"; };
+  forestImg2.style.display = "none";
+  forestImg.onload  = () => { forestImg.style.display = "";
+                              forestImg2.src = forestImg.src;
+                              forestImg2.style.display = ""; };
+  forestImg.onerror = () => { forestImg.style.display = "none";
+                              forestImg2.style.display = "none"; };
   forestImg.src = API+"/forest";
   try{
     const c = await api("/config").then(r=>r.json());
