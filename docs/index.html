@@ -105,12 +105,14 @@
   #pieces rect[data-kind=pole]{fill-opacity:.8;stroke:none}
   #pieces rect[data-kind=prop]{fill-opacity:.9;stroke:rgba(0,0,0,.5);stroke-width:1}
   #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
-  /* Zoomed out a base is a few pixels across: a thin warm rim marks it, and the
-     roofs and floors fill solid so it reads as a building rather than a ring. */
-  .far #pieces rect{fill:none;stroke:rgba(255,140,50,.9);stroke-width:1.5}
-  .far #pieces rect[data-kind=roof]{fill:var(--c);fill-opacity:1;stroke:none}
-  .far #pieces rect[data-kind=floor]{fill:var(--c);fill-opacity:.7;stroke:none}
-  .far #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
+  /* Zoomed out a base is what the sky sees: its roofs. Each roof piece is fattened
+     by a stroke in its own lit or shadowed tone, so a base stays a mark at world
+     zoom without a halo colour of its own; walls thin to the faint lines of the plan. */
+  .far #pieces rect{fill:var(--c);fill-opacity:.9;stroke:none}
+  .far #pieces rect[data-kind=wall]{fill:none;stroke:rgba(30,20,10,.45);stroke-width:1}
+  .far #pieces rect[data-kind=roof]{fill-opacity:1;stroke:var(--c);stroke-width:1.5}
+  .far #pieces rect[data-kind=floor]{fill-opacity:.7}
+  .far #pieces rect[data-kind=crop]{fill:#7fb35a}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
   .marker.portal .nm{color:#9fe8f2}
@@ -413,7 +415,7 @@ const ORDER = ["floor","wall","pole","prop","crop","roof"];
 // Ridge pieces are flat and keep the plain colour.
 const LIGHT = 315;
 function shade(hex, yaw){
-  const f = 1 + 0.28*Math.cos((yaw - LIGHT)*Math.PI/180), v = parseInt(hex, 16);
+  const f = 1 + 0.35*Math.cos((yaw - LIGHT)*Math.PI/180), v = parseInt(hex, 16);
   const ch = b => Math.min(255, Math.round(((v >> b) & 255)*f)).toString(16).padStart(2, "0");
   return ch(16) + ch(8) + ch(0);
 }
@@ -632,7 +634,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12p";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-12q";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
