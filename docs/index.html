@@ -8,6 +8,7 @@
 <meta property="og:title" content="Xandaris Valheim">
 <meta property="og:description" content="Live world map and status for the Xandaris Valheim server.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
   :root{
@@ -93,37 +94,13 @@
   /* ---------- map stage ---------- */
   .stage{flex:1;position:relative;overflow:hidden;background:#0a0c0a;cursor:grab;touch-action:none}
   .stage.dragging{cursor:grabbing}
-  /* The rasters are blitted into one screen-space canvas per view change,
-     only the visible window, nearest-neighbour once zoomed in. Under a CSS
-     transform Chrome GPU-scales a 1:1 raster with bilinear filtering, and
-     image-rendering cannot reach that path: 6 m pixels came out as a smear. */
+  /* Ground, builds and everything crisp go into this one screen-space canvas,
+     redrawn per view change -- map-core.js says why none of it may live under a
+     CSS transform. */
   #mapCanvas{position:absolute;inset:0;width:100%;height:100%;background:#000;visibility:hidden;user-select:none}
-  /* Vector overlays live in screen space with a viewBox that follows the view,
-     not under the map's CSS transform: Chrome caps how finely it rasterises a
-     2048px layer, so anything vector under that transform came out as smeared
-     blobs at high zoom. Here they are rasterised at 1:1 every frame and are crisp
-     at any zoom. Stacking order no longer hides them under the fog, so pieces are
-     filtered against the fog before they are drawn. */
-  #pieces,#portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:4}
-  /* A base reads as a floor plan: walls as lines, floors a tint, roofs barely
-     there, furniture solid. Every storey of a build lands on the same footprint,
-     so opaque fills stacked to a slab. */
-  #pieces rect{vector-effect:non-scaling-stroke;shape-rendering:auto;fill:var(--c)}
-  #pieces rect[data-kind=floor]{fill-opacity:.30;stroke:rgba(40,28,16,.30);stroke-width:1}
-  #pieces rect[data-kind=roof]{fill-opacity:.10;stroke:none}
-  #pieces rect[data-kind=wall]{fill:none;stroke:rgba(38,26,14,.55);stroke-width:1.2}
-  #pieces rect[data-kind=pole]{fill-opacity:.8;stroke:none}
-  #pieces rect[data-kind=prop]{fill-opacity:.9;stroke:rgba(0,0,0,.5);stroke-width:1}
-  #pieces rect[data-kind=crop]{fill:#7fb35a;fill-opacity:.9;stroke:none}
-  /* Zoomed out a base is what the sky sees: its roofs. Each roof piece is fattened
-     by a stroke in its own lit or shadowed tone, so a base stays a mark at world
-     zoom without a halo colour of its own; walls thin to the faint lines of the plan.
-     Hiding the "floor plan up close" legend row keeps this roof view at every zoom. */
-  :is(.far,.no-plan) #pieces rect{fill:var(--c);fill-opacity:.9;stroke:none}
-  :is(.far,.no-plan) #pieces rect[data-kind=wall]{fill:none;stroke:rgba(30,20,10,.45);stroke-width:1}
-  :is(.far,.no-plan) #pieces rect[data-kind=roof]{fill-opacity:1;stroke:var(--c);stroke-width:1.5}
-  :is(.far,.no-plan) #pieces rect[data-kind=floor]{fill-opacity:.7}
-  :is(.far,.no-plan) #pieces rect[data-kind=crop]{fill:#7fb35a}
+  /* Portal lines stay vector, in screen space with a viewBox that follows the
+     view, so they rasterise at 1:1 every frame rather than smearing. */
+  #portalLinks{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:4}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{width:16px;height:16px}
   .marker.portal .nm{color:#9fe8f2}
@@ -135,10 +112,6 @@
   @keyframes hlring{from{transform:scale(.5);opacity:1}to{transform:scale(3.4);opacity:0}}
   .marker.grave .ic{width:16px;height:16px}
   .marker.grave .nm{color:#d9c7a6}
-  /* The forest layer is drawn twice, multiplied both times, which squares its
-     effect: dense woods go markedly darker while a thinned patch barely changes,
-     so the difference between them reads at a glance. One layer alone was too
-     faint over meadow, which is green already. Same URL, so it is one fetch. */
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
   .mapctl{display:flex;flex-direction:column;gap:.35rem}
   .legend{margin-top:1rem;border-top:1px solid var(--line);padding-top:.8rem;
@@ -158,7 +131,6 @@
   .legend [data-layer]{cursor:pointer;user-select:none}
   .legend span[data-layer]:not(.sw):not(.ic):hover{color:var(--ink)}
   .legend [data-layer].off{opacity:.32;text-decoration:line-through}
-  .no-builds #pieces{display:none}
   .no-portal .marker.portal,.no-portal #portalLinks{display:none}
   .no-grave .marker.grave{display:none}
   .no-pin .marker.pin{display:none}
@@ -201,61 +173,9 @@
 </head>
 <body>
 
-<!-- Marker icons. Flat silhouettes with a dark halo (paint-order: stroke) so they
-     hold over meadow green, rock grey and water; one hue per family. -->
-<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
-  <symbol id="ic-raft" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M10 4.6h8.4v6.8h-6v3.2h-2.4z" fill="#ae5139"/>
-    <path d="M2.6 13.8h5.8v5.6H2.6zM9.3 13.8h5.8v5.6H9.3zM16 13.8h5.8v5.6H16z" fill="#d2a271"/>
-  </symbol>
-  <symbol id="ic-karve" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M6.4 3.2h11.2v7.6h-4.2v4h-2.8v-4H6.4z" fill="#ae5139"/>
-    <path d="M1.8 12.6h20.4c-1 4.4-4.8 7-10.2 7S2.8 17 1.8 12.6z" fill="#d2a271"/>
-  </symbol>
-  <symbol id="ic-longship" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M4.6 2.4h14.8v8.2h-6v4.4h-2.8v-4.4H4.6z" fill="#ae5139"/>
-    <path d="M1.6 8.6c1.8.8 2.6 2.2 2.6 4.2h15.6c0-2 .8-3.4 2.6-4.2-.8 2-.4 3.6 0 5.2-.8 4.4-5 6.8-10.4 6.8S2.4 18.2 1.6 13.8c.4-1.6.8-3.2 0-5.2z" fill="#d2a271"/>
-  </symbol>
-  <symbol id="ic-cart" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M16.6 7 21 3.6l1.4 2-4.4 3.4z" fill="#c08a4a"/>
-    <path d="M2.2 6.6h17.2l-2.4 7.6H4.6z" fill="#c08a4a"/>
-    <circle cx="8" cy="17" r="2.9" fill="#e3bd85"/>
-    <circle cx="15.4" cy="17" r="2.9" fill="#e3bd85"/>
-  </symbol>
-  <symbol id="ic-portal" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z" fill="#6fd8e6"/>
-    <path d="M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z" fill="#6fd8e6" fill-opacity=".38" stroke="none"/>
-  </symbol>
-  <symbol id="ic-grave" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M12 3.2c-4.9 0-8.4 3.3-8.4 7.9 0 2.7 1.3 4.7 3 5.8v2.1c0 1 .8 1.8 1.8 1.8h7.2c1 0 1.8-.8 1.8-1.8v-2.1c1.7-1.1 3-3.1 3-5.8 0-4.6-3.5-7.9-8.4-7.9z" fill="#d9c7a6"/>
-    <ellipse cx="8.4" cy="11.2" rx="2.5" ry="2.8" fill="#14130e" stroke="none"/>
-    <ellipse cx="15.6" cy="11.2" rx="2.5" ry="2.8" fill="#14130e" stroke="none"/>
-    <path d="M12 14.2 13.6 17h-3.2z" fill="#14130e" stroke="none"/>
-  </symbol>
-  <symbol id="ic-pin-dot" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <circle cx="12" cy="12" r="5.8" fill="#e8b45f"/>
-  </symbol>
-  <symbol id="ic-pin-fire" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M13 2.4c.8 4-1.6 5.2-3.4 7.2-2 2.2-3.2 4.4-3.2 6.6 0 3.6 2.6 6 5.6 6s5.6-2.4 5.6-6c0-4.4-2.8-8.6-4.6-13.8z" fill="#ef8b3f"/>
-    <path d="M12 11.6c2 2.2 3 3.6 3 5 0 1.8-1.3 3-3 3s-3-1.2-3-3c0-1.4 1-2.8 3-5z" fill="#f8cf72" stroke="none"/>
-  </symbol>
-  <symbol id="ic-pin-mine" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M5.8 18.8 9 21 16.8 9.4 13.6 7.2z" fill="#c2914b"/>
-    <path d="M8.6 4.2Q20.4 1.2 21.6 13 15.2 8 8.6 4.2z" fill="#e8b45f"/>
-  </symbol>
-  <symbol id="ic-pin-house" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M12 3.2 22 12h-3.2v8.4H5.2V12H2z" fill="#e8b45f"/>
-    <path d="M10.2 20.4v-5.2h3.6v5.2z" fill="#14130e" stroke="none"/>
-  </symbol>
-  <symbol id="ic-pin-cave" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M1.8 20.6 6.4 11.4 9.2 13.4 13 7.6 16.8 13.2 18.8 11.6 22.2 20.6z" fill="#e8b45f"/>
-    <path d="M8.4 20.6c0-3.8 1.6-6.2 3.6-6.2s3.6 2.4 3.6 6.2z" fill="#14130e" stroke="none"/>
-  </symbol>
-  <symbol id="ic-plan" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M3.4 3.4h17.2v17.2H3.4z" fill="#a8784a"/>
-    <path d="M11.2 3.4h1.6v17.2h-1.6zM3.4 11.2h17.2v1.6H3.4z" fill="#0f1310" stroke="none"/>
-  </symbol>
-</svg>
+<!-- The marker sprite, injected before the first <use> of it is parsed. -->
+<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
+<script>MapCore.injectSprite(document.getElementById("icons"));</script>
 
 <nav class="nav">
   <span class="brand">Xandaris Valheim</span>
@@ -306,13 +226,6 @@
 
   <div class="stage" id="stage">
     <canvas id="mapCanvas" aria-label="Valheim world map"></canvas>
-    <div id="sources" hidden>
-      <img id="mapBase" crossorigin="anonymous" alt="">
-      <img id="mapForest" crossorigin="anonymous" alt="">
-      <img id="mapStruct" crossorigin="anonymous" alt="">
-      <img id="mapFog" crossorigin="anonymous" alt="">
-    </div>
-    <svg id="pieces" preserveAspectRatio="none" aria-hidden="true"></svg>
     <svg id="portalLinks" preserveAspectRatio="none" aria-hidden="true"></svg>
     <div class="markers" id="markers"></div>
     <div class="mapui">
@@ -374,42 +287,25 @@ const inner = document.getElementById("mapCanvas");
 const rctx = inner.getContext("2d");
 let scale = 1, tx = 0, ty = 0, fit = 1;
 
-// Blit the visible window of each raster: base, forest twice (multiply, for
-// prominence), the structures raster only until the vectors arrive, fog last.
-// Nearest-neighbour for the base once its pixels are bigger than screen pixels.
+const PLAN_ZOOM = MapCore.PLAN_ZOOM, MAX_ZOOM = MapCore.MAX_ZOOM;
+
+// The rasters, then the builds over the fog: a build in unexplored ground has
+// already been dropped, so nothing has to hide it.
 function drawRaster(){
   const W = stage.clientWidth, H = stage.clientHeight;
   if(inner.width !== W || inner.height !== H){ inner.width = W; inner.height = H; }
-  rctx.globalCompositeOperation = "source-over";
-  rctx.fillStyle = "#000"; rctx.fillRect(0, 0, W, H);
-  const sx = -tx/scale, sy = -ty/scale, sw = W/scale, sh = H/scale;
-  const blit = (id, smooth, op) => {
-    const img = document.getElementById(id);
-    if(!img || !img.complete || !img.naturalWidth) return;
-    const k = img.naturalWidth / GEOM.size;          // source px per texture px
-    rctx.imageSmoothingEnabled = smooth;
-    rctx.globalCompositeOperation = op;
-    try{ rctx.drawImage(img, sx*k, sy*k, sw*k, sh*k, 0, 0, W, H); }catch(e){}
-  };
-  blit("mapBase", scale < 3, "source-over");
-  if(!HIDDEN.has("forest")){ blit("mapForest", true, "multiply"); blit("mapForest", true, "multiply"); }
-  if(!HIDDEN.has("builds") && !PIECES) blit("mapStruct", true, "source-over");
-  blit("mapFog", true, "multiply");
+  const v = {scale, tx, ty, w:W, h:H};
+  MapCore.drawRasters(rctx, v, LAYERS.imgs,
+    {bg:"#000", forest:!HIDDEN.has("forest"), structures:!HIDDEN.has("builds") && !PIECES});
+  if(PIECES && !HIDDEN.has("builds"))
+    MapCore.drawPieces(rctx, v, PIECES, {plan: scale >= PLAN_ZOOM && !HIDDEN.has("plan")});
 }
 function apply(){
   drawRaster();
-  // the vector layers see the same window, in texture coordinates
-  const vb = `${(-tx/scale).toFixed(3)} ${(-ty/scale).toFixed(3)} ${(stage.clientWidth/scale).toFixed(3)} ${(stage.clientHeight/scale).toFixed(3)}`;
-  for(const id of ["pieces","portalLinks"]){ const el=document.getElementById(id); if(el) el.setAttribute("viewBox", vb); }
-  structGlow();
+  // the portal lines see the same window, in texture coordinates
+  document.getElementById("portalLinks").setAttribute("viewBox",
+    `${(-tx/scale).toFixed(3)} ${(-ty/scale).toFixed(3)} ${(stage.clientWidth/scale).toFixed(3)} ${(stage.clientHeight/scale).toFixed(3)}`);
   positionMarkers();
-}
-// Roofs until zoom 16: below that a 2 m piece is under 3 px and a floor plan
-// would be a smudge, so the shaded roofs stay until the plan can actually be read.
-const PLAN_ZOOM = 16;
-const MAX_ZOOM = 120;   // a 2 m piece is 20 px: the floor plan of a build can be read
-function structGlow(){
-  document.getElementById("stage").classList.toggle("far", scale < PLAN_ZOOM);
 }
 function positionMarkers(){
   document.querySelectorAll("#markers .marker").forEach(el => {
@@ -427,35 +323,20 @@ function positionMarkers(){
     if(!crowded) kept.push({x, y});
   });
 }
-const PIN_ICON = {dot:"ic-pin-dot", fire:"ic-pin-fire", mine:"ic-pin-mine", house:"ic-pin-house", cave:"ic-pin-cave"};
-// Keyed on the prefab name the mod reports. A hull it doesn't know still draws as a
-// boat rather than vanishing, so a ship added in a later patch needs no change here.
-const VEHICLE = {
-  raft:       {icon:"ic-raft",     label:"Raft",      size:15},
-  karve:      {icon:"ic-karve",    label:"Karve",     size:18},
-  vikingship: {icon:"ic-longship", label:"Longship",  size:22},
-  cart:       {icon:"ic-cart",     label:"Cart",      size:16},
-};
-function vehicleStyle(m){
-  const v = VEHICLE[(m.name||"").toLowerCase()];
-  if (v) return v;
-  return m.kind === "cart" ? VEHICLE.cart
-                           : {icon:"ic-karve", label:m.name || "Boat", size:18};
-}
 function buildMarkers(players, pinList, vehicles){
   const p = (players||[]).map(m =>
     `<div class="marker" data-px="${m.px}" data-py="${m.py}">`
     + `<span class="dot"></span><span class="nm">${esc(m.name)}</span></div>`);
   const q = (pinList||[]).map(m =>
     `<div class="marker pin" data-px="${m.px}" data-py="${m.py}" title="${esc(m.owner||"")}">`
-    + `<svg class="ic"><use href="#${PIN_ICON[m.type] || PIN_ICON.dot}"></use></svg>`
+    + `<svg class="ic"><use href="#ic-${MapCore.PIN_ICON[m.type] || "pin-dot"}"></use></svg>`
     + (m.text ? `<span class="nm">${esc(m.text)}</span>` : "") + `</div>`);
   // named on hover only -- a harbour with six boats would be a wall of text.
   // Hull size is drawn to scale so a longship reads as one without a label.
   const v = (vehicles||[]).map(m => {
-    const st = vehicleStyle(m);
+    const st = MapCore.vehicleStyle(m);
     return `<div class="marker veh" data-kind="${st.label.toLowerCase()}" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
-      + `<svg class="ic" style="width:${st.size}px;height:${st.size}px"><use href="#${st.icon}"></use></svg></div>`;
+      + `<svg class="ic" style="width:${st.size}px;height:${st.size}px"><use href="#ic-${st.icon}"></use></svg></div>`;
   });
   // Named, because the name is the whole point of a portal.
   const w = (PORTALS||[]).map(m =>
@@ -471,70 +352,14 @@ function buildMarkers(players, pinList, vehicles){
   drawPortalLinks();
   positionMarkers();
 }
-// The same rules the server uses for footprints, applied to how a piece is drawn.
-const kindOf = n => { n = n.toLowerCase();
-  return n.includes("sapling") ? "crop" : n.includes("roof") ? "roof" : n.includes("floor") ? "floor"
-       : /wall|fence|gate|beam|stake/.test(n) ? "wall" : n.includes("pole") ? "pole" : "prop"; };
-
-// A coarse copy of the fog, refreshed each time pieces are drawn, so a build in
-// unexplored ground is dropped before drawing. Until the fog has loaded, nothing
-// is dropped rather than everything.
-const FOGN = 512; let fogData = null;
-function sampleFog(){
-  const img = document.getElementById("mapFog");
-  if(!img || !img.complete || !img.naturalWidth){ fogData = null; return; }
-  try{
-    const c = document.createElement("canvas"); c.width = c.height = FOGN;
-    const g = c.getContext("2d", {willReadFrequently:true});
-    g.drawImage(img, 0, 0, FOGN, FOGN);
-    fogData = g.getImageData(0, 0, FOGN, FOGN).data;
-  }catch(e){ fogData = null; }
+// Builds arrive as footprints once per revision and are drawn from the parsed
+// list every frame; a fresh fog re-tests which of them stand in walked ground.
+let PIECES_ALL = null;
+function setPieces(list){ PIECES_ALL = list; refilterPieces(); }
+function refilterPieces(){
+  PIECES = PIECES_ALL && MapCore.filterExplored(PIECES_ALL, LAYERS.imgs.fog);
+  drawRaster();
 }
-function explored(px, py){
-  if(!fogData) return true;
-  const k = FOGN/GEOM.size;
-  const x = Math.min(FOGN-1, Math.max(0, (px*k)|0)), y = Math.min(FOGN-1, Math.max(0, (py*k)|0));
-  return fogData[(y*FOGN+x)*4] > 40;
-}
-
-// Each piece is a rect centred on its position, sized in texture pixels from its
-// footprint in metres, rotated by its yaw. Every storey of a build lands on the
-// same footprint, so one rect per (kind, position, yaw) is drawn, not one per piece.
-// Drawn floors, walls, furniture, then roofs: up close the roof tint hides nothing,
-// zoomed out the solid roof covers the beams and interior walls beneath it.
-const ORDER = ["floor","wall","pole","prop","crop","roof"];
-// Roofs are lit from the north-west: the slope facing the light goes lighter and
-// the far slope darker, so a gable reads as a roof rather than a flat tile.
-// Ridge pieces are flat and keep the plain colour.
-const LIGHT = 315;
-function shade(hex, yaw){
-  const f = 1 + 0.35*Math.cos((yaw - LIGHT)*Math.PI/180), v = parseInt(hex, 16);
-  const ch = b => Math.min(255, Math.round(((v >> b) & 255)*f)).toString(16).padStart(2, "0");
-  return ch(16) + ch(8) + ch(0);
-}
-function drawPieces(){
-  const svg = document.getElementById("pieces");
-  if(!svg || !PIECES) return;
-  sampleFog();
-  const per = 1/GEOM.pixel, half = GEOM.size/2, seen = new Set();
-  const out = Object.fromEntries(ORDER.map(k => [k, []]));
-  for(const [k,x,z,yaw] of PIECES.pieces){
-    const p = PIECES.prefabs[k]; if(!p) continue;
-    const px = x*per+half, py = half-z*per;
-    if(!explored(px, py)) continue;
-    const kind = kindOf(p.n);
-    const key = kind+":"+x.toFixed(1)+":"+z.toFixed(1)+":"+yaw;
-    if(seen.has(key)) continue; seen.add(key);
-    const w = Math.max(p.w*per, 0.08), d = Math.max(p.d*per, 0.08);
-    const c = kind === "roof" && !p.n.includes("_top") ? shade(p.c, yaw) : p.c;
-    out[kind].push(`<rect data-kind="${kind}" x="${(-w/2).toFixed(3)}" y="${(-d/2).toFixed(3)}" width="${w.toFixed(3)}" height="${d.toFixed(3)}" style="--c:#${c}" transform="translate(${px.toFixed(2)} ${py.toFixed(2)}) rotate(${yaw})"></rect>`);
-  }
-  svg.innerHTML = ORDER.map(k => out[k].join("")).join("");
-  const raster = document.getElementById("mapStruct");
-  if (raster) raster.style.display = PIECES.count ? "none" : "";
-  structGlow();
-}
-document.getElementById("mapFog").addEventListener("load", () => { if(PIECES) drawPieces(); });
 
 // One line per connected pair, drawn once from each end's own record, so a pair
 // whose far side sits in unexplored ground simply has no line.
@@ -616,7 +441,7 @@ function fitExplored(doFit = true){
   const g = c.getContext("2d", {willReadFrequently:true});
   let d;
   try{
-    g.drawImage(document.getElementById("mapFog"), 0, 0, N, N);
+    g.drawImage(LAYERS.imgs.fog, 0, 0, N, N);
     d = g.getImageData(0, 0, N, N).data;
   }catch(e){ return fitView(); }
   let x0=N, y0=N, x1=-1, y1=-1, seen=0;
@@ -709,16 +534,19 @@ addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 // Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
 // forgotten tab costs nothing.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
+// any layer arriving or refreshing is a redraw; a fresh fog also re-tests which
+// builds stand in ground someone has walked
+const LAYERS = MapCore.layers(API, k => { if(k === "fog" && PIECES_ALL) refilterPieces(); else drawRaster(); });
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13za";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13zb";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
-let GEOM = {pixel: 12, size: 2048};
+const GEOM = MapCore.geom;
 
-function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+const esc = MapCore.esc;
 function tile(k,v,sub){ return `<div class="tile"><div class="k">${k}</div><div class="v">${v}${sub?` <small>${sub}</small>`:""}</div></div>`; }
 // Statuspage summary, rendered in the site's own styling rather than their
 // floating widget. Their v2 API is CORS-open, so no proxy is involved.
@@ -755,21 +583,7 @@ function renderStatus(){
     return `<span class="${CLS[live]||""}"><span class="dot"></span>${esc(c.name)}</span>`;
   }).join("");
 }
-function ago(iso){
-  const d=(Date.now()-new Date(iso).getTime())/1000;
-  if(!isFinite(d)) return "";
-  if(d<90) return "just now";
-  if(d<3600) return Math.round(d/60)+"m ago";
-  if(d<86400) return Math.round(d/3600)+"h ago";
-  return Math.round(d/86400)+"d ago";
-}
-async function api(path){
-  const r = await fetch(API+path, {cache:"no-store"});
-  if(!r.ok) throw new Error(path+" "+r.status);
-  return r;
-}
-// world -> image pixels, the same transform the mod's own UI uses
-function toPx(x,z){ return {px: x/GEOM.pixel + GEOM.size/2, py: GEOM.size/2 - z/GEOM.pixel}; }
+const ago = MapCore.ago, toPx = MapCore.toPx;
 
 function renderTiles(){
   const count = (PLAYERS && PLAYERS.count != null) ? PLAYERS.count : "\u2014";
@@ -801,65 +615,35 @@ function renderFeed(msgs){
   }).join("");
 }
 
-// One document per tick carries every small block the page shows, plus a
-// revision per large layer; a layer is fetched only when its revision moved,
-// and the Worker keeps a versioned layer on the edge for an hour.
-const REV = {};
-function parsePins(lines){
-  return (lines||[]).map(line=>{
-    const f=line.split(",");
-    if(f.length<6) return null;
-    const x=parseFloat(f[4]), z=parseFloat(f[5]);
-    if(!isFinite(x)||!isFinite(z)) return null;
-    return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
-  }).filter(Boolean);
-}
-function loadLayer(id, path, rev, after){
-  const img=document.getElementById(id);
-  const p=new Image(); p.crossOrigin="anonymous";
-  p.onload=()=>{ img.src=p.src; if(after) after(); };
-  p.src = API+path+"?v="+rev;
-}
 async function tickState(){
   let s;
-  try{ s = await api("/state").then(r=>r.json()); }
+  try{ s = await MapCore.fetchState(API); }
   catch(e){
     setPill(false);
     document.getElementById("stamp").textContent = "server unreachable";
     return;
   }
   setPill(true);
-  document.getElementById("stamp").textContent = "live \u00b7 updated " + new Date().toLocaleTimeString();
+  document.getElementById("stamp").textContent = "live · updated " + new Date().toLocaleTimeString();
   PLAYERS = s.players || {};
   VEHICLES = ((s.vehicles||{}).vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
   PORTALS = ((s.portals||{}).portals||[]).map(p=>({id:p.id, name:p.name, to:p.to, ...toPx(p.x,p.z)}));
   GRAVES = ((s.graves||{}).graves||[]).map(g=>({name:g.name, age:g.age, ...toPx(g.x,g.z)}));
-  PINS = parsePins(s.pins);
+  PINS = MapCore.parsePins(s.pins);
   if(s.forest) FOREST = s.forest;
   renderTiles();
   if(s.messages) renderFeed(s.messages);
-  const rev = s.rev || {};
-  if(rev.pieces !== REV.pieces){
-    try{
-      const pj = await api("/pieces?v="+rev.pieces).then(r=>r.json());
-      if(pj && pj.pieces){ PIECES = pj; drawPieces(); REV.pieces = rev.pieces; }
-    }catch(e){}
-  }
-  if(rev.forest !== REV.forest){ REV.forest = rev.forest; loadLayer("mapForest", "/forest", rev.forest); }
-  if(!PIECES && rev.structures !== REV.structures){ REV.structures = rev.structures; loadLayer("mapStruct", "/structures", rev.structures); }
-  if(rev.fog !== REV.fog){ REV.fog = rev.fog; loadLayer("mapFog", "/fog", rev.fog, ()=>setTimeout(()=>fitExplored(false),60)); }
+  await LAYERS.sync(s.rev, {
+    pieces: setPieces,
+    structures: () => !PIECES,      // the raster only stands in until the footprints land
+    onFog: () => setTimeout(()=>fitExplored(false), 60),
+  });
 }
 
 async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
-  document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=4k";
-  // any layer arriving or refreshing is a redraw
-  for(const id of ["mapBase","mapForest","mapStruct","mapFog"])
-    document.getElementById(id).addEventListener("load", () => drawRaster());
-  try{
-    const c = await api("/config").then(r=>r.json());
-    GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
-  }catch(e){}
+  LAYERS.loadBase();
+  try{ await MapCore.fetchConfig(API); }catch(e){}
   await tickState();
   applyHash();                 // needs the portals list, which the first tick brings
   // visibility-gated so a background tab makes no requests
@@ -921,20 +705,11 @@ function applyHash(){
 addEventListener("hashchange", applyHash);
 
 computeFit(); fitView();
-// The base render is the whole world; it must never be visible without the fog
-// mask on top of it. Reveal only when both layers have decoded.
-let _layers = 0;
-function layerReady(){
-  if(++_layers >= 2){
-    LAYERS_READY = true;
-    inner.classList.add("ready");
-    fitExplored(!HASH_VIEW);
-  }
-}
-["mapBase","mapFog"].forEach(id => {
-  const el = document.getElementById(id);
-  if(el.complete && el.naturalWidth) layerReady();
-  else el.addEventListener("load", layerReady, {once:true});
+// the ground is the whole world and must never show without its fog mask
+LAYERS.whenReady(["base", "fog"], () => {
+  LAYERS_READY = true;
+  inner.classList.add("ready");
+  fitExplored(!HASH_VIEW);
 });
 boot();
 </script>
