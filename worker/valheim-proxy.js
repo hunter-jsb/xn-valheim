@@ -24,6 +24,7 @@ const ROUTES = {
   "/forest/stats": { ttl: 30 },
   "/structures": { ttl: 30, image: true },
   "/structures/stats": { ttl: 10 },
+  "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/vehicles": { ttl: 3 },        // boats and carts move; the mod sweeps once a minute while read
   "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
