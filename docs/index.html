@@ -89,6 +89,8 @@
     margin:-9px 0 0 -9px;border-radius:50%;border:2px solid #9fe8f2;pointer-events:none;
     animation:hlring 1s ease-out infinite}
   @keyframes hlring{from{transform:scale(.5);opacity:1}to{transform:scale(3.4);opacity:0}}
+  .marker.trader .ic{width:16px;height:16px}
+  .marker.trader .nm{color:#f0cf7a}
   .marker.grave .ic{width:16px;height:16px}
   .marker.grave .nm{color:#d9c7a6}
   .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;align-items:flex-end;gap:.5rem}
@@ -112,6 +114,7 @@
   .legend [data-layer].off{opacity:.32;text-decoration:line-through}
   .no-portal .marker.portal,.no-portal #portalLinks{display:none}
   .no-grave .marker.grave{display:none}
+  .no-trader .marker.trader{display:none}
   .no-pin .marker.pin{display:none}
   .no-vehicles .marker[data-kind="raft"],.no-vehicles .marker[data-kind="karve"],
   .no-vehicles .marker[data-kind="longship"],.no-vehicles .marker[data-kind="cart"]{display:none}
@@ -180,6 +183,7 @@
       <span class="ic" data-layer="vehicles"><svg style="width:22px;height:22px"><use href="#ic-longship"></use></svg></span><span data-layer="vehicles">boats &amp; carts</span>
       <span class="ic" data-layer="portal"><svg style="width:16px;height:16px"><use href="#ic-portal"></use></svg></span><span data-layer="portal">portals</span>
       <span class="ic" data-layer="grave"><svg style="width:16px;height:16px"><use href="#ic-grave"></use></svg></span><span data-layer="grave">graves</span>
+      <span class="ic" data-layer="trader"><svg style="width:16px;height:16px"><use href="#ic-trader"></use></svg></span><span data-layer="trader">traders</span>
       <span class="ic" data-layer="pin"><svg style="width:17px;height:17px"><use href="#ic-pin-dot"></use></svg></span><span data-layer="pin">pins</span>
     </div>
     <p class="stamp" id="stamp"></p>
@@ -314,7 +318,11 @@ function buildMarkers(players, pinList, vehicles){
     `<div class="marker grave" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"grave")}${m.age>0?" · "+graveAge(m.age):""}">`
     + `<svg class="ic"><use href="#ic-grave"></use></svg>`
     + (m.name ? `<span class="nm">${esc(m.name)}</span>` : "") + `</div>`);
-  document.getElementById("markers").innerHTML = p.concat(q).concat(v).concat(w).concat(g).join("");
+  // A trader is a place, so it wears its name like a portal does.
+  const t = (TRADERS||[]).map(m =>
+    `<div class="marker trader" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name)}">`
+    + `<svg class="ic"><use href="#ic-trader"></use></svg><span class="nm">${esc(m.name)}</span></div>`);
+  document.getElementById("markers").innerHTML = p.concat(q).concat(v).concat(w).concat(g).concat(t).join("");
   drawPortalLinks();
   positionMarkers();
 }
@@ -506,9 +514,10 @@ const LAYERS = MapCore.layers(API, k => { if(k === "fog" && PIECES_ALL) refilter
 let VEHICLES = null;      // boats and carts, refreshed on the slow tick; null = not fetched
 let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
+let TRADERS = [];         // Haldor, Hildir, the Bog Witch: only those in walked ground
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13zc";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13zd";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 const GEOM = MapCore.geom;
 
@@ -595,6 +604,7 @@ async function tickState(){
   VEHICLES = ((s.vehicles||{}).vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
   PORTALS = ((s.portals||{}).portals||[]).map(p=>({id:p.id, name:p.name, to:p.to, ...toPx(p.x,p.z)}));
   GRAVES = ((s.graves||{}).graves||[]).map(g=>({name:g.name, age:g.age, ...toPx(g.x,g.z)}));
+  TRADERS = ((s.traders||{}).traders||[]).map(t=>({name:t.name, ...toPx(t.x,t.z)}));
   PINS = MapCore.parsePins(s.pins);
   if(s.forest) FOREST = s.forest;
   renderTiles();
