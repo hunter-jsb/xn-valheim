@@ -23,10 +23,8 @@ const ROUTES = {
   "/forest": { ttl: 60, image: true },
   "/forest/stats": { ttl: 30 },
   "/structures": { ttl: 30, image: true },
-  "/structures/refresh": { ttl: 0 },
   "/structures/stats": { ttl: 10 },
-  // boats and carts move; freshness comes from nudging the sweep below
-  "/vehicles": { ttl: 3 },        // sweeps are on the mod's timer until it gets a real floor
+  "/vehicles": { ttl: 3 },        // boats and carts move; the mod sweeps once a minute while read
   "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
   "/pieces":  { ttl: 30 },        // every placed piece as a footprint; changes only as people build
