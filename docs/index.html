@@ -700,7 +700,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13x";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13y";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -787,83 +787,58 @@ function renderFeed(msgs){
   }).join("");
 }
 
-async function tickFast(){                 // players + chat: the things that move
-  try{
-    const [pj, mj] = await Promise.all([
-      api("/players").then(r=>r.json()),
-      api("/messages").then(r=>r.json()).catch(()=>null),
-    ]);
-    PLAYERS = pj || {};
-    setPill(true);
-    document.getElementById("stamp").textContent = "live \u00b7 updated " + new Date().toLocaleTimeString();
-    renderTiles();
-    if(mj) renderFeed(mj);
-  }catch(e){
+// One document per tick carries every small block the page shows, plus a
+// revision per large layer; a layer is fetched only when its revision moved,
+// and the Worker keeps a versioned layer on the edge for an hour.
+const REV = {};
+function parsePins(lines){
+  return (lines||[]).map(line=>{
+    const f=line.split(",");
+    if(f.length<6) return null;
+    const x=parseFloat(f[4]), z=parseFloat(f[5]);
+    if(!isFinite(x)||!isFinite(z)) return null;
+    return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
+  }).filter(Boolean);
+}
+function loadLayer(id, path, rev, after){
+  const img=document.getElementById(id);
+  const p=new Image(); p.crossOrigin="anonymous";
+  p.onload=()=>{ img.src=p.src; if(after) after(); };
+  p.src = API+path+"?v="+rev;
+}
+async function tickState(){
+  let s;
+  try{ s = await api("/state").then(r=>r.json()); }
+  catch(e){
     setPill(false);
     document.getElementById("stamp").textContent = "server unreachable";
+    return;
   }
-}
-// Asking for this is also what tells the server to re-sweep, so polling it is
-// what keeps boats current rather than merely reading a stale answer sooner.
-async function tickVehicles(){
-  try{
-    const vj = await api("/vehicles").then(r=>r.json());
-    VEHICLES = (vj.vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
-    renderTiles();
-  }catch(e){}
-}
-async function tickSlow(){                 // pins + fog: change rarely
-  try{
-    const csv = await api("/pins").then(r=>r.text());
-    PINS = csv.split("\n").filter(Boolean).map(line=>{
-      const f=line.split(",");
-      if(f.length<6) return null;
-      const x=parseFloat(f[4]), z=parseFloat(f[5]);
-      if(!isFinite(x)||!isFinite(z)) return null;
-      return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), ...toPx(x,z)};
-    }).filter(Boolean);
-    renderTiles();
-  }catch(e){}
-  try{
-    const pj = await api("/portals").then(r=>r.json());
-    PORTALS = (pj.portals||[]).map(p=>({id:p.id, name:p.name, to:p.to, ...toPx(p.x,p.z)}));
-    renderTiles();
-  }catch(e){}
-  try{
-    const gj = await api("/graves").then(r=>r.json());
-    GRAVES = (gj.graves||[]).map(g=>({name:g.name, age:g.age, ...toPx(g.x,g.z)}));
-    renderTiles();
-  }catch(e){}
-  try{
-    const pj = await api("/pieces").then(r=>r.json());
-    if(pj && pj.pieces){ PIECES = pj; drawPieces(); }
-  }catch(e){}
-  try{ FOREST = await api("/forest/stats").then(r=>r.json()); }catch(e){}
+  setPill(true);
+  document.getElementById("stamp").textContent = "live \u00b7 updated " + new Date().toLocaleTimeString();
+  PLAYERS = s.players || {};
+  VEHICLES = ((s.vehicles||{}).vehicles||[]).map(v=>({kind:v.kind, name:v.name, ...toPx(v.x,v.z)}));
+  PORTALS = ((s.portals||{}).portals||[]).map(p=>({id:p.id, name:p.name, to:p.to, ...toPx(p.x,p.z)}));
+  GRAVES = ((s.graves||{}).graves||[]).map(g=>({name:g.name, age:g.age, ...toPx(g.x,g.z)}));
+  PINS = parsePins(s.pins);
+  if(s.forest) FOREST = s.forest;
   renderTiles();
-  const st=document.getElementById("mapStruct");
-  const sProbe=new Image();
-  sProbe.crossOrigin="anonymous";
-  sProbe.onload=()=>{ st.src=sProbe.src; };
-  if(!PIECES) sProbe.src = API+"/structures?"+Date.now();   // vectors replace the raster
-
-  const fr=document.getElementById("mapForest");
-  const fProbe=new Image();
-  fProbe.crossOrigin="anonymous";
-  fProbe.onload=()=>{ fr.src=fProbe.src; };
-  fProbe.src = API+"/forest?"+Date.now();
-
-  const fog=document.getElementById("mapFog");
-  const probe=new Image();
-  probe.crossOrigin="anonymous";
-  probe.onload=()=>{ fog.src=probe.src; setTimeout(()=>fitExplored(false),60); };
-  probe.src = API+"/fog?"+Date.now();
+  if(s.messages) renderFeed(s.messages);
+  const rev = s.rev || {};
+  if(rev.pieces !== REV.pieces){
+    try{
+      const pj = await api("/pieces?v="+rev.pieces).then(r=>r.json());
+      if(pj && pj.pieces){ PIECES = pj; drawPieces(); REV.pieces = rev.pieces; }
+    }catch(e){}
+  }
+  if(rev.forest !== REV.forest){ REV.forest = rev.forest; loadLayer("mapForest", "/forest", rev.forest); }
+  if(!PIECES && rev.structures !== REV.structures){ REV.structures = rev.structures; loadLayer("mapStruct", "/structures", rev.structures); }
+  if(rev.fog !== REV.fog){ REV.fog = rev.fog; loadLayer("mapFog", "/fog", rev.fog, ()=>setTimeout(()=>fitExplored(false),60)); }
 }
 
 async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
   document.getElementById("mapBase").src = API+"/base-6f3a9c2e?v=4k";
-  document.getElementById("mapStruct").src = API+"/structures";
-  document.getElementById("mapForest").src = API+"/forest";
   // any layer arriving or refreshing is a redraw
   for(const id of ["mapBase","mapForest","mapStruct","mapFog"])
     document.getElementById(id).addEventListener("load", () => drawRaster());
@@ -871,17 +846,13 @@ async function boot(){
     const c = await api("/config").then(r=>r.json());
     GEOM = {pixel: c.pixel_size||12, size: c.texture_size||2048, world: c.world_name};
   }catch(e){}
-  await tickFast();
-  await tickSlow();
-  applyHash();                 // needs the portals list, which tickSlow fetches
-  await tickVehicles();
+  await tickState();
+  applyHash();                 // needs the portals list, which the first tick brings
   // visibility-gated so a background tab makes no requests
-  setInterval(()=>{ if(document.visibilityState==="visible") tickFast(); }, 5000);
-  setInterval(()=>{ if(document.visibilityState==="visible") tickSlow(); }, 30000);
-  setInterval(()=>{ if(document.visibilityState==="visible") tickVehicles(); }, 10000);
+  setInterval(()=>{ if(document.visibilityState==="visible") tickState(); }, 5000);
   tickStatus();
   setInterval(()=>{ if(document.visibilityState==="visible") tickStatus(); }, 60000);
-  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickFast(); });
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickState(); });
 }
 
 // ---------- deep links ----------
