@@ -15,20 +15,26 @@ const ALLOWED_ORIGINS = new Set([
 // Only these are proxied. Everything else 404s, so this can't be used as an
 // open relay to arbitrary hosts or paths.
 const ROUTES = {
+  // One document per tick: every small block the map polls, plus a revision per
+  // large layer so the page asks for a layer only when its picture changed.
+  "/state":    { ttl: 2 },
   "/messages": { ttl: 0 },
   "/players":  { ttl: 0 },
   "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
-  "/fog":      { ttl: 5, image: true },
-  "/forest": { ttl: 60, image: true },
+  // The layers carry a content revision in ?v= from /state. A request that names a
+  // revision can sit on the edge for an hour, since a changed picture has a new
+  // name; a request without one keeps the short TTL for pages that poll them plain.
+  "/fog":      { ttl: 5, image: true, versioned: true, vttl: 3600 },
+  "/forest": { ttl: 60, image: true, versioned: true, vttl: 3600 },
   "/forest/stats": { ttl: 30 },
-  "/structures": { ttl: 30, image: true },
+  "/structures": { ttl: 30, image: true, versioned: true, vttl: 3600 },
   "/structures/stats": { ttl: 10 },
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/vehicles": { ttl: 3 },        // boats and carts move; the mod sweeps once a minute while read
   "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
   "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
-  "/pieces":  { ttl: 30 },        // every placed piece as a footprint; changes only as people build
+  "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a
@@ -67,6 +73,7 @@ export default {
     }
 
 
+    const ttl = route.versioned && url.search && route.vttl ? route.vttl : route.ttl;
     let upstream;
     try {
       // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat TTL
@@ -74,9 +81,9 @@ export default {
       // for the whole TTL -- which reads as "the map is broken for one player".
       upstream = await fetch(UPSTREAM + (route.upstream || url.pathname) + (route.versioned ? url.search : ""), {
         method: "GET",
-        cf: route.ttl
+        cf: ttl
           ? { cacheEverything: true,
-              cacheTtlByStatus: { "200-299": route.ttl, "300-399": 0, "400-499": 0, "500-599": 0 } }
+              cacheTtlByStatus: { "200-299": ttl, "300-399": 0, "400-499": 0, "500-599": 0 } }
           : { cacheTtl: 0 },
       });
     } catch (e) {
@@ -99,7 +106,7 @@ export default {
     const ct = upstream.headers.get("content-type");
     // the mod misspells this one as "applicaion/json"
     headers.set("content-type", ct && !ct.startsWith("applicaion") ? ct : "application/json");
-    headers.set("cache-control", route.ttl ? `public, max-age=${route.ttl}` : "no-store");
+    headers.set("cache-control", ttl ? `public, max-age=${ttl}` : "no-store");
     return new Response(upstream.body, { status: upstream.status, headers });
   },
 };
