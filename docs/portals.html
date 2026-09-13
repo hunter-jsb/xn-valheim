@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
 <title>Portals — Xandaris Valheim</title>
-<meta name="description" content="Every portal on the Xandaris Valheim server, which pairs are linked, and where they stand.">
+<meta name="description" content="An atlas of the server's portals: every hub and the wheel of places it reaches.">
 <meta property="og:title" content="Xandaris Valheim — Portals">
-<meta property="og:description" content="Every portal on the server, which pairs are linked, and where they stand.">
+<meta property="og:description" content="Every hub and the wheel of places it reaches, linked now or one retag away.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -54,7 +54,7 @@
   .row{display:flex;gap:.75rem;align-items:flex-start;background:var(--card);
     border:1px solid var(--line);border-radius:.6rem;padding:.65rem .75rem;color:var(--ink)}
   .row:hover{border-color:var(--gold);text-decoration:none}
-  .row .ic{width:19px;height:19px;flex:0 0 auto;margin-top:.15rem;overflow:visible;
+  .row .ic,.card h3 .ic{width:19px;height:19px;flex:0 0 auto;margin-top:.15rem;overflow:visible;
     filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
   .bd{min-width:0;flex:1}
   .nm{font-size:.9rem;font-weight:600;color:#fff;display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem}
@@ -63,9 +63,31 @@
   /* the coordinates are the point of the row: readable, but the name leads */
   .ends{margin-top:.25rem;display:grid;gap:.1rem;font-size:.74rem;color:var(--muted);
     font-variant-numeric:tabular-nums}
-  .ends .xz{color:#c2bcab}
+  .ends .xz,.meta .xz{color:#c2bcab}
   .empty{color:var(--muted);font-size:.82rem;padding:.8rem 0}
   .foot{color:var(--muted);font-size:.72rem;margin-top:1.6rem;border-top:1px solid var(--line);padding-top:.8rem}
+
+  /* ---------- a hub and its wheel ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:.7rem;
+    padding:.8rem .8rem .9rem;margin-bottom:.8rem}
+  .card h3{font-size:.92rem;font-weight:600;color:#fff;display:flex;gap:.6rem;align-items:flex-start}
+  .meta{color:var(--muted);font-size:.74rem;margin-top:.15rem;font-variant-numeric:tabular-nums}
+  .wheel{display:block;width:100%;max-width:440px;height:auto;margin:.35rem auto 0;
+    font-family:inherit;touch-action:manipulation}
+  .wheel a{cursor:pointer}
+  .wheel a:hover .lb{fill:var(--gold)}
+  .spokes{list-style:none;display:grid;gap:.2rem;margin-top:.55rem;
+    border-top:1px solid var(--line);padding-top:.55rem}
+  .spokes a{display:flex;flex-wrap:wrap;gap:.4rem;align-items:baseline;color:var(--muted);
+    font-size:.78rem;padding:.2rem .3rem;border-radius:.35rem;font-variant-numeric:tabular-nums}
+  .spokes a:hover{background:#1f2521;text-decoration:none}
+  .spokes .g{color:#fff;font-weight:600}
+  .spokes .arr{color:var(--portal)}
+  .spokes .to{color:var(--ink)}
+  .spokes .st{margin-left:auto;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;
+    white-space:nowrap}
+  .spokes .on{color:var(--portal)}
+  .spokes .dial{color:var(--unknown)}
 </style>
 </head>
 <body>
@@ -97,56 +119,309 @@
   <p class="sub" id="count">reading the world…</p>
   <p class="note" id="note"></p>
   <div class="list" id="list"></div>
-  <p class="foot"><span id="stamp"></span> · a row opens the map on that portal ·
+  <p class="foot"><span id="stamp"></span> · a spoke opens the map on that portal ·
     <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></p>
 </main>
 
 <script>
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
-let WORLD = "", LAST = "";
+const SITE_R = 80;    // portals this close stand at one place
+const PIN_R  = 120;   // a house pin this close gives that place its name
+let WORLD = "", PINS = [], LAST = "", LAST_HEAD = "";
 
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function plural(n, w){ return n + " " + w + (n === 1 ? "" : "s"); }
+function r2(n){ return Math.round(n*10)/10; }
 
-// Valheim's +z is north, +x east, and every distance here is from the world
-// centre — which is where everyone spawns, so it is the shared frame of reference.
+// Valheim's +z is north, +x east, and a lone distance is from the world centre —
+// which is where everyone spawns, so it is the shared frame of reference.
 const DIRS = ["north","north-east","east","south-east","south","south-west","west","north-west"];
-function bearing(x, z){ return DIRS[Math.round(((Math.atan2(x, z)*180/Math.PI + 360) % 360)/45) % 8]; }
+const ABBR = ["N","NE","E","SE","S","SW","W","NW"];
+function deg(dx, dz){ return (Math.atan2(dx, dz)*180/Math.PI + 360) % 360; }
+function bearing(dx, dz){ return DIRS[Math.round(deg(dx, dz)/45) % 8]; }
+function abbr(dx, dz){ return ABBR[Math.round(deg(dx, dz)/45) % 8]; }
 function span(d){ return d < 1000 ? Math.round(d) + " m" : (d/1000).toFixed(1) + " km"; }
 function where(p){
   const d = Math.hypot(p.x, p.z), xz = `${Math.round(p.x)}, ${Math.round(p.z)}`;
   return `<span class="xz">${xz}</span> · ` + (d < 50 ? "the world centre" : `${bearing(p.x, p.z)}, ${span(d)}`);
 }
 function nameOf(p){ return p.name ? esc(p.name) : `<span class="un">unnamed</span>`; }
+function link(id){ return `index.html#portal=${encodeURIComponent(id)}`; }
 // Either end serves as the link target: the map fits the whole pair anyway.
 function row(ends){
-  return `<a class="row" href="index.html#portal=${encodeURIComponent(ends[0].id)}">`
+  return `<a class="row" href="${link(ends[0].id)}">`
     + `<svg class="ic"><use href="#ic-portal"></use></svg><div class="bd">`
     + `<div class="nm">${ends.map(nameOf).join('<span class="arr">&#8596;</span>')}</div>`
     + `<div class="ends">${ends.map(e => `<span>${where(e)}</span>`).join("")}</div>`
     + `</div></a>`;
 }
 
+function parsePins(text){
+  return String(text||"").split(/\r?\n/).map(line => {
+    const f = line.split(",");
+    if(f.length < 6) return null;
+    const x = parseFloat(f[4]), z = parseFloat(f[5]);
+    if(!isFinite(x) || !isFinite(z)) return null;
+    return {type:f[2], text:f.slice(6).join(",").trim(), x, z};
+  }).filter(Boolean);
+}
+
+// ---------- sites ----------
+// Portals within 80 m of one another stand at the same place; the chain is
+// single-link, so a strung-out base still reads as one site.
+function cluster(list){
+  const up = list.map((_, i) => i);
+  const find = i => up[i] === i ? i : (up[i] = find(up[i]));
+  for(let i = 0; i < list.length; i++) for(let j = i+1; j < list.length; j++)
+    if(Math.hypot(list[i].x-list[j].x, list[i].z-list[j].z) <= SITE_R){
+      const a = find(i), b = find(j); if(a !== b) up[a] = b;
+    }
+  const by = new Map();
+  list.forEach((p, i) => { const r = find(i); (by.get(r) || by.set(r, []).get(r)).push(p); });
+  return [...by.values()].map(portals => {
+    const x = portals.reduce((t, p) => t+p.x, 0)/portals.length;
+    const z = portals.reduce((t, p) => t+p.z, 0)/portals.length;
+    return {portals, x, z, label: siteName(portals)};
+  });
+}
+// A house pin standing in the place names it; failing that the portals name
+// themselves by their tags, which is what players actually say out loud.
+function siteName(portals){
+  let best = null, bd = PIN_R;
+  for(const pin of PINS){
+    if(pin.type !== "house" || !pin.text) continue;
+    for(const p of portals){
+      const d = Math.hypot(pin.x-p.x, pin.z-p.z);
+      if(d < bd){ bd = d; best = pin; }
+    }
+  }
+  if(best) return best.text;
+  const tags = [...new Set(portals.map(p => p.name).filter(Boolean))]
+    .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  return tags.length ? tags.join(" · ") : "unnamed site";
+}
+
+// ---------- wheel ----------
+const W = 400, C = W/2, HUB_R = 44, R0 = 86, R1 = 114, STEP = 24, LH = 12;
+const NARROW = "iljtfrI!.,;:'|·()[]/ ", WIDE = "mwMW@";
+// no measuring in an SVG we have not drawn yet, so estimate the ink a string takes
+function tw(s, size){
+  let u = 0;
+  for(const c of s) u += NARROW.includes(c) ? .34 : WIDE.includes(c) ? .92
+    : (c >= "A" && c <= "Z") ? .66 : .55;
+  return u*size;
+}
+function wrap(text, size, maxW, maxLines){
+  const words = text.split(" "), out = [];
+  for(const w of words){
+    const last = out.length - 1;
+    if(last >= 0 && tw(out[last] + " " + w, size) <= maxW) out[last] += " " + w;
+    else out.push(w);
+  }
+  if(out.length > maxLines){ out.length = maxLines; out[maxLines-1] += "…"; }
+  return out.map(l => l.replace(/ ·(…?)$/, "$1"));
+}
+function boxOf(L){
+  const x0 = L.anchor === "start" ? L.x : L.anchor === "end" ? L.x - L.w : L.x - L.w/2;
+  return {x0: x0-2, x1: x0+L.w+2, y0: L.y-10, y1: L.y-10 + L.lines.length*LH + 2};
+}
+function clampXY(L){
+  const half = L.anchor === "start" ? 0 : L.anchor === "end" ? L.w : L.w/2;
+  L.x = Math.max(4 + half, Math.min(W - 4 - (L.w - half), L.x));
+  L.y = Math.max(13, Math.min(W + 5 - L.lines.length*LH, L.y));
+  return L;
+}
+function distToBox(cx, cy, b){
+  return Math.hypot(Math.max(b.x0-cx, 0, cx-b.x1), Math.max(b.y0-cy, 0, cy-b.y1));
+}
+function clearDisc(L){
+  for(let i = 0; i < 14 && distToBox(C, C, boxOf(L)) < HUB_R + 5; i++){
+    const d = Math.hypot(L.x-C, L.y-C) || 1;
+    L.x += (L.x-C)/d*4; L.y += (L.y-C)/d*4;
+  }
+}
+// A gate's tag stands beside its own spoke — never struck through by the line,
+// never lying on the disc. The offset is the box's own reach along the
+// perpendicular, so a wide tag on a slanted spoke still clears it.
+function mkTag(t, s){
+  const a = s.br*Math.PI/180;
+  let qx = Math.cos(a), qy = Math.sin(a);          // the clockwise side of the spoke
+  if(s.side < 0 || (!s.side && qy > 0)){ qx = -qx; qy = -qy; }
+  const w = tw(t, 10), off = Math.abs(qx)*w/2 + Math.abs(qy)*7 + 4;
+  const L = {lines: [{t, size: 10, fill: "#c2bcab"}], w, anchor: "middle", dy: 0,
+    x: C + s.ux*(HUB_R+12) + qx*off, y: C + s.uy*(HUB_R+12) + qy*off + 3};
+  L.ax = L.x; L.ay = L.y;
+  clearDisc(L);
+  return clampXY(L);
+}
+function mkLabel(lines, px, py, ux, uy, gap){
+  const w = Math.max(...lines.map(l => tw(l.t, l.size)));
+  let x = px + ux*gap, y = py + uy*gap;
+  let anchor = ux > .3 ? "start" : ux < -.3 ? "end" : "middle";
+  y += uy < -.5 ? -(lines.length-1)*LH - 4 : uy > .5 ? 8 : -(lines.length-1)*LH/2;
+  const room = anchor === "start" ? W-6-x : anchor === "end" ? x-6 : 2*Math.min(x-6, W-6-x);
+  // nothing like enough width out there: sit the block over or under the end instead
+  if(w > room){ anchor = "middle"; x = px; y = py + (uy < 0 ? -(lines.length*LH) - 5 : 17); }
+  return clampXY({lines, x, y, anchor, w, ax: px, ay: py, dy: 0});
+}
+// Spokes within ~20° of each other put their labels on top of one another;
+// nudge them apart, but never so far that a label drifts off its own spoke.
+function separate(labels){
+  for(let pass = 0; pass < 40; pass++){
+    let hit = false;
+    for(let i = 0; i < labels.length; i++) for(let j = i+1; j < labels.length; j++){
+      const A = boxOf(labels[i]), B = boxOf(labels[j]);
+      if(Math.min(A.x1,B.x1) <= Math.max(A.x0,B.x0)) continue;
+      const over = Math.min(A.y1,B.y1) - Math.max(A.y0,B.y0);
+      if(over <= 0) continue;
+      hit = true;
+      const step = Math.min(over/2 + .5, 3);
+      const up = (A.y0 + A.y1) <= (B.y0 + B.y1) ? -1 : 1;
+      nudge(labels[i], up*step); nudge(labels[j], -up*step);
+    }
+    if(!hit) break;
+  }
+}
+function nudge(L, dy){
+  if(Math.abs(L.dy + dy) > 26) return;
+  L.dy += dy; L.y += dy;
+}
+function drawLabel(L){
+  const lead = Math.abs(L.dy) > 11
+    ? `<line x1="${r2(L.ax)}" y1="${r2(L.ay)}" x2="${r2(L.x)}" y2="${r2(L.y - 10 + L.lines.length*LH/2)}" stroke="#3c433c" stroke-width="1"/>` : "";
+  return lead + L.lines.map((l, i) =>
+    `<text class="lb" x="${r2(L.x)}" y="${r2(L.y + i*LH)}" text-anchor="${L.anchor}" font-size="${l.size}"`
+    + (l.bold ? ` font-weight="600"` : "") + ` fill="${l.fill}">${esc(l.t)}</text>`).join("");
+}
+
+// The wheel: north up, every spoke on its true bearing, length by rank of
+// distance so the far ends order themselves without swamping the near ones.
+function wheel(hub, sps){
+  const n = sps.length;
+  [...sps].sort((a, b) => a.d - b.d).forEach((s, i) => { s.len = n > 1 ? R0 + (R1-R0)*i/(n-1) : (R0+R1)/2; });
+  const ring = [...sps].sort((a, b) => a.br - b.br);
+  let run = 0, took = -1;
+  ring.forEach((s, i) => {
+    run = i && (s.br - ring[i-1].br) < 22 ? run + 1 : 0; s.lane = run;
+    // a tag takes the roomier of the two wedges beside its spoke, unless the
+    // spoke before it has already moved into that one
+    const plus = n < 2 ? 0 : (ring[(i+1) % n].br - s.br + 360) % 360;
+    const minus = n < 2 ? 0 : (s.br - ring[(i-1+n) % n].br + 360) % 360;
+    let w = plus >= minus ? i : (i-1+n) % n;
+    if(n > 1 && w === took && Math.max(plus, minus) < 30 && Math.min(plus, minus) > 10)
+      w = w === i ? (i-1+n) % n : i;
+    s.side = n < 2 ? 0 : w === i ? 1 : -1;
+    took = w;
+  });
+  if(n > 2 && ring[0].lane === 0 && ring[n-1].lane === 0 && ring[0].br + 360 - ring[n-1].br < 22)
+    ring[n-1].lane = 1;
+
+  const labels = [], parts = [];
+  for(const s of sps){
+    const a = s.br*Math.PI/180;
+    s.len += STEP*(s.lane % 3);
+    s.ux = Math.sin(a); s.uy = -Math.cos(a);
+    s.ex = C + s.ux*s.len; s.ey = C + s.uy*s.len;
+    s.gate = mkTag(s.kind === "dial" ? "dial " + s.tag : s.tag, s);
+    s.dest = mkLabel([{t: s.dst.label, size: 11, bold: 1, fill: "#ffffff"},
+                      {t: span(s.d) + " " + s.ab, size: 9.5, fill: "#9aa093"}],
+      s.ex, s.ey, s.ux, s.uy, 14);
+    labels.push(s.gate, s.dest);
+  }
+  separate(labels);
+  for(const s of sps) clearDisc(s.gate);
+  separate(labels);
+
+  for(const s of sps){
+    const dial = s.kind === "dial";
+    parts.push(`<line x1="${r2(C + s.ux*(HUB_R+2))}" y1="${r2(C + s.uy*(HUB_R+2))}" x2="${r2(s.ex)}" y2="${r2(s.ey)}"`
+      + (dial ? ` stroke="#767c6f" stroke-width="1.6" stroke-dasharray="5 5"` : ` stroke="#6fd8e6" stroke-width="2"`)
+      + ` stroke-linecap="round"/>`);
+    parts.push(`<a href="${link(s.target)}" tabindex="-1">`
+      + `<circle cx="${r2(s.ex)}" cy="${r2(s.ey)}" r="15" fill="transparent"/>`
+      + `<use href="#ic-portal" x="${r2(s.ex-9)}" y="${r2(s.ey-9)}" width="18" height="18"${dial ? ` opacity=".5"` : ""}/>`
+      + drawLabel(s.gate) + drawLabel(s.dest) + `</a>`);
+  }
+  // north is up: say so once, in the corner, where no spoke reaches
+  const rose = `<g opacity=".55"><path d="M${W-20} 40V20m0 0-4 6m4-6 4 6" fill="none" stroke="#9aa093"`
+    + ` stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
+    + `<text x="${W-20}" y="15" text-anchor="middle" font-size="9" font-weight="600" fill="#9aa093">N</text></g>`;
+  const disc = wrap(hub.label, 9.5, 70, 4);
+  const top = C - (disc.length-1)*5;
+  return `<svg class="wheel" viewBox="0 0 ${W} ${W}" aria-hidden="true" focusable="false">`
+    + rose + parts.join("")
+    + `<circle cx="${C}" cy="${C}" r="${HUB_R}" fill="#1d2320" stroke="#6fd8e6" stroke-opacity=".55" stroke-width="1.5"/>`
+    + disc.map((t, i) => `<text x="${C}" y="${r2(top + i*10)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="#e7e2d4">${esc(t)}</text>`).join("")
+    + `</svg>`;
+}
+
+function hubCard(hub, sps){
+  const d = Math.hypot(hub.x, hub.z);
+  const free = hub.portals.filter(p => !p.to).length;
+  const meta = `${plural(hub.portals.length, "gate")}${free ? ` (${free} free)` : ""} · `
+    + `<span class="xz">${Math.round(hub.x)}, ${Math.round(hub.z)}</span> · `
+    + (d < 50 ? "the world centre" : `${bearing(hub.x, hub.z)}, ${span(d)} out`);
+  const one = sps.filter(s => s.kind === "link").length === 1;
+  const li = s => `<li><a href="${link(s.target)}">`
+    + `<span class="g">${s.kind === "dial" ? "dial " : ""}${esc(s.tag)}</span><span class="arr">&#8594;</span>`
+    + `<span class="to">${esc(s.dst.label)}</span> <span>· ${span(s.d)} ${s.ab}</span>`
+    + `<span class="st ${s.kind === "dial" ? "dial" : "on"}">`
+    + (s.kind === "dial" ? "one retag away" : one ? "dialled now" : "linked") + `</span></a></li>`;
+  return `<section class="card"><h3><svg class="ic"><use href="#ic-portal"></use></svg>`
+    + `<span>${esc(hub.label)}</span></h3><p class="meta">${meta}</p>`
+    + (sps.length ? wheel(hub, sps) + `<ul class="spokes">${sps.map(li).join("")}</ul>`
+                  : `<p class="empty">No gate here reaches anywhere yet.</p>`)
+    + `</section>`;
+}
+
 function render(list){
   const by = new Map(list.map(p => [p.id, p]));
-  const pairs = [], singles = [], seen = new Set();
+  const twin = p => { const q = (p.to && p.to !== "0") ? by.get(p.to) : null; return (q && q.id !== p.id) ? q : null; };
+  const sites = cluster(list);
+  const siteOf = new Map();
+  sites.forEach(s => s.portals.forEach(p => siteOf.set(p.id, s)));
+  const hubs = sites.filter(s => s.portals.length > 1)
+    .sort((a, b) => b.portals.length - a.portals.length || a.label.localeCompare(b.label));
+
+  const pairs = [], seen = new Set();
   for(const p of list){
     if(seen.has(p.id)) continue;
-    const q = (p.to && p.to !== "0" && p.to !== 0) ? by.get(p.to) : null;
-    if(q && q.id !== p.id){ seen.add(p.id); seen.add(q.id); pairs.push([p, q]); }
-    else singles.push(p);
+    const q = twin(p);
+    if(q){ seen.add(p.id); seen.add(q.id); pairs.push([p, q]); }
   }
-  const key = p => (p.name || "￿").toLowerCase();       // untagged portals sort last
-  pairs.sort((a, b) => key(a[0]).localeCompare(key(b[0])) || key(a[1]).localeCompare(key(b[1])));
-  singles.sort((a, b) => key(a).localeCompare(key(b)));
+  // A tagged portal standing unlinked is a number you can dial: any free gate
+  // retagged to match will open onto it. Untagged and unlinked is just stone.
+  const dials = list.filter(p => !twin(p) && p.name);
+  const atHub = p => siteOf.get(p.id).portals.length > 1;
+  const elsewhere = pairs.filter(([a, b]) => !atHub(a) && !atHub(b));
+  const loose = list.filter(p => !twin(p) && (!p.name || !hubs.length));
 
-  document.getElementById("count").innerHTML =
-    (WORLD ? `<b>${esc(WORLD)}</b> · ` : "") + plural(list.length, "portal")
-    + ` · ${plural(pairs.length, "linked pair")} · ${singles.length} unlinked`;
+  const head = (WORLD ? `<b>${esc(WORLD)}</b> · ` : "") + plural(list.length, "portal")
+    + ` · ${plural(hubs.length, "hub")} · ${plural(pairs.length, "pair")} · ${loose.length} loose`;
+  if(head !== LAST_HEAD){ document.getElementById("count").innerHTML = head; LAST_HEAD = head; }
 
   let html = "";
-  if(pairs.length) html += `<h2>Linked pairs</h2><div class="rows">${pairs.map(row).join("")}</div>`;
-  if(singles.length) html += `<h2>Unlinked</h2><div class="rows">${singles.map(p => row([p])).join("")}</div>`;
+  for(const hub of hubs){
+    const sps = [];
+    for(const g of hub.portals){
+      const q = twin(g); if(!q) continue;
+      const dst = siteOf.get(q.id); if(dst === hub) continue;
+      sps.push({kind: "link", tag: g.name || "untagged", dst, target: g.id});
+    }
+    for(const p of dials){
+      const dst = siteOf.get(p.id); if(dst === hub) continue;
+      sps.push({kind: "dial", tag: p.name, dst, target: p.id});
+    }
+    for(const s of sps){
+      const dx = s.dst.x - hub.x, dz = s.dst.z - hub.z;
+      s.d = Math.hypot(dx, dz); s.br = deg(dx, dz); s.ab = abbr(dx, dz);
+    }
+    sps.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "link" ? -1 : 1) || a.d - b.d);
+    html += hubCard(hub, sps);
+  }
+  if(hubs.length) html = `<h2>${hubs.length === 1 ? "Hub" : "Hubs"}</h2>` + html;
+  if(elsewhere.length) html += `<h2>Elsewhere</h2><div class="rows">${elsewhere.map(row).join("")}</div>`;
+  if(loose.length) html += `<h2>Loose</h2><div class="rows">${loose.map(p => row([p])).join("")}</div>`;
   if(!list.length) html = `<p class="empty">No portals standing in this world yet.</p>`;
   const el = document.getElementById("list");
   if(html !== LAST){ el.innerHTML = html; LAST = html; }   // untouched DOM, so no flicker on the minute
@@ -154,15 +429,19 @@ function render(list){
 
 async function load(){
   try{
-    const r = await fetch(API + "/portals", {cache:"no-store"});
+    const [r, pins] = await Promise.all([
+      fetch(API + "/portals", {cache:"no-store"}),
+      fetch(API + "/pins", {cache:"no-store"}).then(x => x.ok ? x.text() : null).catch(() => null)
+    ]);
     if(!r.ok) throw new Error("portals " + r.status);
     const j = await r.json();
+    if(pins !== null) PINS = parsePins(pins);      // no pins: sites still name themselves by tag
     render(j.portals || []);
     document.getElementById("note").textContent = "";
     document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
   }catch(e){
-    // keep whatever is on screen: a stale list beats an empty one
-    document.getElementById("note").textContent = "server unreachable — this list may be out of date";
+    // keep whatever is on screen: a stale atlas beats an empty one
+    document.getElementById("note").textContent = "server unreachable — this atlas may be out of date";
   }
 }
 
