@@ -662,7 +662,9 @@ async function load(){
     PINS = MapCore.parsePins(s.pins);
     if(s.rev && s.rev.fog !== FOG_REV){ FOG_REV = s.rev.fog; LAY.load("fog", "/fog", FOG_REV); }
     // the chart is one image per world; its revision arrives with the state like the others
-    if(s.rev && s.rev.chart && s.rev.chart !== CHART_REV){ CHART_REV = s.rev.chart; LAY.load("chart", "/chart", CHART_REV); }
+    // a server that does not yet say which chart it has still has one: ask for it by the old name
+    const cr = (s.rev && s.rev.chart) || "1";
+    if(cr !== CHART_REV){ CHART_REV = cr; LAY.load("chart", "/chart", CHART_REV); }
     render(((s.portals || {}).portals) || []);
     document.getElementById("note").textContent = "";
     document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
