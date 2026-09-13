@@ -291,21 +291,27 @@ function draw(){
   pending = true;
   requestAnimationFrame(() => { pending = false; paint(); });
 }
-// The map's own raster pass -- base and fog, no forest, no builds -- then one
-// filter: grey, dim and washed cool, so the cyan network is the only colour here.
+// The server's chart -- each pixel its biome's flat colour, water one blue -- with
+// the fog over it, so the network sits on matte ground. Until the server has a
+// chart, the map's own render is filtered grey and cool instead.
 function paint(){
   const pix = sizeCanvas(), W = stage.clientWidth, H = stage.clientHeight;
   const v = {scale, tx, ty, w: W, h: H, pix};
-  MapCore.drawRasters(sctx, v, LAY.imgs, {bg: "#05070a"});
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
-  ctx.filter = "grayscale(.85) contrast(1.45) brightness(.74)";
-  ctx.drawImage(scratch, 0, 0);
-  ctx.filter = "none";
-  ctx.globalCompositeOperation = "color";        // the land keeps its light, not its hue
-  ctx.globalAlpha = .6;
-  ctx.fillStyle = "#4b7ea8";
-  ctx.fillRect(0, 0, cv.width, cv.height);
+  if(LAY.ready("chart")){
+    MapCore.drawRasters(ctx, v, {base: LAY.imgs.chart, fog: LAY.imgs.fog}, {bg: "#05070a"});
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }else{
+    MapCore.drawRasters(sctx, v, LAY.imgs, {bg: "#05070a"});
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "grayscale(.85) contrast(1.45) brightness(.74)";
+    ctx.drawImage(scratch, 0, 0);
+    ctx.filter = "none";
+    ctx.globalCompositeOperation = "color";        // the land keeps its light, not its hue
+    ctx.globalAlpha = .6;
+    ctx.fillStyle = "#4b7ea8";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+  }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
   layout(v);
   drawSpokes(v);
@@ -700,6 +706,7 @@ async function load(){
 (async () => {
   computeFit(); fitAll();                 // the whole world until the portals say otherwise
   LAY.loadBase();
+  LAY.loadChart();
   try{ WORLD = (await MapCore.fetchConfig(API)).world || ""; }catch(e){}
   await load();
   setInterval(() => { if(document.visibilityState === "visible") load(); }, 60000);

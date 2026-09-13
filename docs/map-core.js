@@ -51,7 +51,7 @@ async function fetchConfig(base){ return setGeom(await fetchJSON(base, "/config"
 const BASE_TEX = "/base-6f3a9c2e";      // the world render, versioned by hand
 function layers(base, onLoad){
   const imgs = {}, rev = {};
-  for(const k of ["base", "forest", "struct", "fog"]){
+  for(const k of ["base", "forest", "struct", "fog", "chart"]){
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.addEventListener("load", () => { if(onLoad) onLoad(k); });
@@ -86,7 +86,8 @@ function layers(base, onLoad){
     if(r.fog !== rev.fog){ rev.fog = r.fog; load("fog", "/fog", r.fog, o.onFog); }
   }
   return {imgs, rev, ready, load, whenReady, sync,
-          loadBase: () => load("base", BASE_TEX, "4k")};
+          loadBase: () => load("base", BASE_TEX, "4k"),
+          loadChart: () => load("chart", "/chart")};     // flat biome chart, one per world
 }
 
 // ---------- rasters ----------
