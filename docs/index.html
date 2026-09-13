@@ -330,6 +330,7 @@ function apply(){
 // Roofs until zoom 16: below that a 2 m piece is under 3 px and a floor plan
 // would be a smudge, so the shaded roofs stay until the plan can actually be read.
 const PLAN_ZOOM = 16;
+const MAX_ZOOM = 120;   // a 2 m piece is 20 px: the floor plan of a build can be read
 function structGlow(){
   document.getElementById("stage").classList.toggle("far", scale < PLAN_ZOOM);
 }
@@ -516,7 +517,7 @@ function fitView(){          // whole world
 function fitBox(bx,by,bw,bh){
   computeFit();
   const w = stage.clientWidth, h = stage.clientHeight, pad = 1.6;
-  scale = clamp(Math.min(w/(bw*pad), h/(bh*pad)), fit, 40);
+  scale = clamp(Math.min(w/(bw*pad), h/(bh*pad)), fit, MAX_ZOOM);
   tx = w/2 - (bx + bw/2) * scale;
   ty = h/2 - (by + bh/2) * scale;
   apply();
@@ -547,7 +548,7 @@ function fitExplored(doFit = true){
 }
 
 function zoomAt(cx, cy, factor){
-  const ns = clamp(scale*factor, fit*0.5, 40);
+  const ns = clamp(scale*factor, fit*0.5, MAX_ZOOM);
   tx = cx - (cx - tx) * (ns/scale);
   ty = cy - (cy - ty) * (ns/scale);
   scale = ns; apply();
@@ -626,7 +627,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13u";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13v";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
