@@ -33,6 +33,10 @@
   .navlinks::-webkit-scrollbar{display:none}
   .navlinks a{color:var(--ink);white-space:nowrap}
   .navlinks a:hover{color:var(--gold)}
+  /* the pages of this site, then a rule, then the links that leave it */
+  .navlinks .ext{display:flex;gap:1.1rem;padding-left:1.1rem;border-left:1px solid var(--line)}
+  .navlinks .ext a{color:var(--muted)}
+  .navlinks .ext a::after{content:"\2197";font-size:.7em;margin-left:.25em;opacity:.7}
   .navlinks a.here{color:var(--gold)}
   @media (max-width:760px){ .brand{font-size:.8rem} }
 
@@ -80,9 +84,11 @@
     <a class="here" href="portals.html">Portals</a>
     <a href="plan.html">Plan</a>
     <a href="players.html">Players</a>
-    <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
-    <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
-    <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+    <span class="ext">
+      <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
+      <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+    </span>
   </div>
 </nav>
 

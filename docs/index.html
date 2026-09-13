@@ -33,6 +33,10 @@
   .navlinks::-webkit-scrollbar{display:none}
   .navlinks a{color:var(--ink);white-space:nowrap}
   .navlinks a:hover{color:var(--gold)}
+  /* the pages of this site, then a rule, then the links that leave it */
+  .navlinks .ext{display:flex;gap:1.1rem;padding-left:1.1rem;border-left:1px solid var(--line)}
+  .navlinks .ext a{color:var(--muted)}
+  .navlinks .ext a::after{content:"\2197";font-size:.7em;margin-left:.25em;opacity:.7}
   .navlinks a.here{color:var(--gold)}
 
   /* ---------- app shell ---------- */
@@ -158,8 +162,8 @@
   .no-portal .marker.portal,.no-portal #portalLinks{display:none}
   .no-grave .marker.grave{display:none}
   .no-pin .marker.pin{display:none}
-  .no-raft .marker[data-kind="raft"],.no-karve .marker[data-kind="karve"],
-  .no-longship .marker[data-kind="longship"],.no-cart .marker[data-kind="cart"]{display:none}
+  .no-vehicles .marker[data-kind="raft"],.no-vehicles .marker[data-kind="karve"],
+  .no-vehicles .marker[data-kind="longship"],.no-vehicles .marker[data-kind="cart"]{display:none}
   .mapctl button{width:36px;height:36px;border-radius:.45rem;border:1px solid var(--line);
     background:rgba(18,21,15,.9);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1}
   .mapctl button:hover{border-color:var(--gold);color:var(--gold)}
@@ -260,9 +264,11 @@
     <a href="portals.html">Portals</a>
     <a href="plan.html">Plan</a>
     <a href="players.html">Players</a>
-    <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
-    <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
-    <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+    <span class="ext">
+      <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
+      <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
+      <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+    </span>
   </div>
 </nav>
 
@@ -285,10 +291,7 @@
       <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">forest → cleared</span>
       <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">builds</span>
       <span class="ic" data-layer="plan"><svg style="width:18px;height:18px"><use href="#ic-plan"></use></svg></span><span data-layer="plan">floor plan when close</span>
-      <span class="ic" data-layer="raft"><svg style="width:15px;height:15px"><use href="#ic-raft"></use></svg></span><span data-layer="raft">rafts</span>
-      <span class="ic" data-layer="karve"><svg style="width:18px;height:18px"><use href="#ic-karve"></use></svg></span><span data-layer="karve">karves</span>
-      <span class="ic" data-layer="longship"><svg style="width:22px;height:22px"><use href="#ic-longship"></use></svg></span><span data-layer="longship">longships</span>
-      <span class="ic" data-layer="cart"><svg style="width:16px;height:16px"><use href="#ic-cart"></use></svg></span><span data-layer="cart">carts</span>
+      <span class="ic" data-layer="vehicles"><svg style="width:22px;height:22px"><use href="#ic-longship"></use></svg></span><span data-layer="vehicles">boats &amp; carts</span>
       <span class="ic" data-layer="portal"><svg style="width:16px;height:16px"><use href="#ic-portal"></use></svg></span><span data-layer="portal">portals</span>
       <span class="ic" data-layer="grave"><svg style="width:16px;height:16px"><use href="#ic-grave"></use></svg></span><span data-layer="grave">graves</span>
       <span class="ic" data-layer="pin"><svg style="width:17px;height:17px"><use href="#ic-pin-dot"></use></svg></span><span data-layer="pin">pins</span>
@@ -711,7 +714,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13z";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13za";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
