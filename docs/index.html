@@ -73,10 +73,11 @@
   .marker .nm{font-size:.66rem;color:#fff;background:rgba(10,12,10,.8);padding:1px 5px;
     border-radius:.3rem;white-space:nowrap}
   #mapCanvas.ready{visibility:visible}
-  .marker.pin .ic{font-size:15px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
+  .marker .ic{display:block;flex:0 0 auto;overflow:visible;filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
+  .marker.pin .ic{width:17px;height:17px}
   .marker.pin .nm{color:var(--gold)}
   /* parked kit, not people: visible on a look but never competing with players */
-  .marker.veh .ic{font-size:12px;line-height:1;opacity:.85;filter:drop-shadow(0 1px 2px #000)}
+  .marker.veh .ic{opacity:.92}
   .stamp{color:var(--muted);font-size:.72rem;margin-top:1rem}
   .sidefoot{color:var(--muted);font-size:.72rem;margin-top:.8rem;border-top:1px solid var(--line);padding-top:.8rem}
 
@@ -115,9 +116,9 @@
   :is(.far,.no-plan) #pieces rect[data-kind=floor]{fill-opacity:.7}
   :is(.far,.no-plan) #pieces rect[data-kind=crop]{fill:#7fb35a}
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
-  .marker.portal .ic{font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px #000)}
+  .marker.portal .ic{width:16px;height:16px}
   .marker.portal .nm{color:#9fe8f2}
-  .marker.grave .ic{font-size:12px;line-height:1;opacity:.9;filter:drop-shadow(0 1px 2px #000)}
+  .marker.grave .ic{width:16px;height:16px}
   .marker.grave .nm{color:#d9c7a6}
   /* The forest layer is drawn twice, multiplied both times, which squares its
      effect: dense woods go markedly darker while a thinned patch barely changes,
@@ -134,7 +135,8 @@
   .legend .sw{width:26px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.7)}
   /* one chip for both ends of the same scale: dense woods through to bare ground */
   .legend .sw2{background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
-  .legend .ic{width:26px;text-align:center;font-size:12px;line-height:1}
+  .legend .ic{width:26px;height:22px;display:flex;align-items:center;justify-content:center}
+  .legend .ic svg{width:18px;height:18px;overflow:visible;pointer-events:none}
   .legend h3 small{display:block;font-weight:400;text-transform:none;letter-spacing:0;
     font-size:.66rem;opacity:.75;margin-top:.15rem}
   /* The legend is also the layer switch: each row hides what it depicts. */
@@ -173,7 +175,8 @@
             border-top:1px solid var(--line);padding-top:.7rem;margin-top:.1rem;font-size:.8rem}
   .pintypes b{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.07em;
               font-size:.7rem;margin-right:.2rem}
-  .pintypes span{color:#fff}
+  .pintypes span{color:#fff;display:flex;align-items:center;gap:.3rem}
+  .pintypes svg{width:17px;height:17px;overflow:visible;flex:0 0 auto}
   .types b{color:var(--ink);font-weight:600}
   @media (max-width:760px){
     .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.6)}
@@ -182,6 +185,62 @@
 </style>
 </head>
 <body>
+
+<!-- Marker icons. Flat silhouettes with a dark halo (paint-order: stroke) so they
+     hold over meadow green, rock grey and water; one hue per family. -->
+<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="ic-raft" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M10 4.6h8.4v6.8h-6v3.2h-2.4z" fill="#ae5139"/>
+    <path d="M2.6 13.8h5.8v5.6H2.6zM9.3 13.8h5.8v5.6H9.3zM16 13.8h5.8v5.6H16z" fill="#d2a271"/>
+  </symbol>
+  <symbol id="ic-karve" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M6.4 3.2h11.2v7.6h-4.2v4h-2.8v-4H6.4z" fill="#ae5139"/>
+    <path d="M1.8 12.6h20.4c-1 4.4-4.8 7-10.2 7S2.8 17 1.8 12.6z" fill="#d2a271"/>
+  </symbol>
+  <symbol id="ic-longship" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M4.6 2.4h14.8v8.2h-6v4.4h-2.8v-4.4H4.6z" fill="#ae5139"/>
+    <path d="M1.6 8.6c1.8.8 2.6 2.2 2.6 4.2h15.6c0-2 .8-3.4 2.6-4.2-.8 2-.4 3.6 0 5.2-.8 4.4-5 6.8-10.4 6.8S2.4 18.2 1.6 13.8c.4-1.6.8-3.2 0-5.2z" fill="#d2a271"/>
+  </symbol>
+  <symbol id="ic-cart" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M16.6 7 21 3.6l1.4 2-4.4 3.4z" fill="#c08a4a"/>
+    <path d="M2.2 6.6h17.2l-2.4 7.6H4.6z" fill="#c08a4a"/>
+    <circle cx="8" cy="17" r="2.9" fill="#e3bd85"/>
+    <circle cx="15.4" cy="17" r="2.9" fill="#e3bd85"/>
+  </symbol>
+  <symbol id="ic-portal" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z" fill="#6fd8e6"/>
+    <path d="M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z" fill="#6fd8e6" fill-opacity=".38" stroke="none"/>
+  </symbol>
+  <symbol id="ic-grave" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M12 3.2c-4.9 0-8.4 3.3-8.4 7.9 0 2.7 1.3 4.7 3 5.8v2.1c0 1 .8 1.8 1.8 1.8h7.2c1 0 1.8-.8 1.8-1.8v-2.1c1.7-1.1 3-3.1 3-5.8 0-4.6-3.5-7.9-8.4-7.9z" fill="#d9c7a6"/>
+    <ellipse cx="8.4" cy="11.2" rx="2.5" ry="2.8" fill="#14130e" stroke="none"/>
+    <ellipse cx="15.6" cy="11.2" rx="2.5" ry="2.8" fill="#14130e" stroke="none"/>
+    <path d="M12 14.2 13.6 17h-3.2z" fill="#14130e" stroke="none"/>
+  </symbol>
+  <symbol id="ic-pin-dot" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <circle cx="12" cy="12" r="5.8" fill="#e8b45f"/>
+  </symbol>
+  <symbol id="ic-pin-fire" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M13 2.4c.8 4-1.6 5.2-3.4 7.2-2 2.2-3.2 4.4-3.2 6.6 0 3.6 2.6 6 5.6 6s5.6-2.4 5.6-6c0-4.4-2.8-8.6-4.6-13.8z" fill="#ef8b3f"/>
+    <path d="M12 11.6c2 2.2 3 3.6 3 5 0 1.8-1.3 3-3 3s-3-1.2-3-3c0-1.4 1-2.8 3-5z" fill="#f8cf72" stroke="none"/>
+  </symbol>
+  <symbol id="ic-pin-mine" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M5.8 18.8 9 21 16.8 9.4 13.6 7.2z" fill="#c2914b"/>
+    <path d="M8.6 4.2Q20.4 1.2 21.6 13 15.2 8 8.6 4.2z" fill="#e8b45f"/>
+  </symbol>
+  <symbol id="ic-pin-house" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M12 3.2 22 12h-3.2v8.4H5.2V12H2z" fill="#e8b45f"/>
+    <path d="M10.2 20.4v-5.2h3.6v5.2z" fill="#14130e" stroke="none"/>
+  </symbol>
+  <symbol id="ic-pin-cave" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M1.8 20.6 6.4 11.4 9.2 13.4 13 7.6 16.8 13.2 18.8 11.6 22.2 20.6z" fill="#e8b45f"/>
+    <path d="M8.4 20.6c0-3.8 1.6-6.2 3.6-6.2s3.6 2.4 3.6 6.2z" fill="#14130e" stroke="none"/>
+  </symbol>
+  <symbol id="ic-plan" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M3.4 3.4h17.2v17.2H3.4z" fill="#a8784a"/>
+    <path d="M11.2 3.4h1.6v17.2h-1.6zM3.4 11.2h17.2v1.6H3.4z" fill="#0f1310" stroke="none"/>
+  </symbol>
+</svg>
 
 <nav class="nav">
   <span class="brand">Xandaris Valheim</span>
@@ -210,14 +269,14 @@
       <h3>Layers <small>click a row to hide or show it</small></h3>
       <span class="sw sw2" data-layer="forest"></span><span data-layer="forest">forest → cleared</span>
       <span class="sw" data-layer="builds" style="background:#966c42"></span><span data-layer="builds">builds</span>
-      <span class="ic" data-layer="plan">▦</span><span data-layer="plan">floor plan when close</span>
-      <span class="ic" data-layer="raft">🛶</span><span data-layer="raft">rafts</span>
-      <span class="ic" data-layer="karve">⛵</span><span data-layer="karve">karves</span>
-      <span class="ic" data-layer="longship">🚢</span><span data-layer="longship">longships</span>
-      <span class="ic" data-layer="cart">🛒</span><span data-layer="cart">carts</span>
-      <span class="ic" data-layer="portal">🌀</span><span data-layer="portal">portals</span>
-      <span class="ic" data-layer="grave">🪦</span><span data-layer="grave">graves</span>
-      <span class="ic" data-layer="pin">●</span><span data-layer="pin">pins</span>
+      <span class="ic" data-layer="plan"><svg style="width:18px;height:18px"><use href="#ic-plan"></use></svg></span><span data-layer="plan">floor plan when close</span>
+      <span class="ic" data-layer="raft"><svg style="width:15px;height:15px"><use href="#ic-raft"></use></svg></span><span data-layer="raft">rafts</span>
+      <span class="ic" data-layer="karve"><svg style="width:18px;height:18px"><use href="#ic-karve"></use></svg></span><span data-layer="karve">karves</span>
+      <span class="ic" data-layer="longship"><svg style="width:22px;height:22px"><use href="#ic-longship"></use></svg></span><span data-layer="longship">longships</span>
+      <span class="ic" data-layer="cart"><svg style="width:16px;height:16px"><use href="#ic-cart"></use></svg></span><span data-layer="cart">carts</span>
+      <span class="ic" data-layer="portal"><svg style="width:16px;height:16px"><use href="#ic-portal"></use></svg></span><span data-layer="portal">portals</span>
+      <span class="ic" data-layer="grave"><svg style="width:16px;height:16px"><use href="#ic-grave"></use></svg></span><span data-layer="grave">graves</span>
+      <span class="ic" data-layer="pin"><svg style="width:17px;height:17px"><use href="#ic-pin-dot"></use></svg></span><span data-layer="pin">pins</span>
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
@@ -266,11 +325,11 @@
       <div><code>!deletePin</code><span>with no text, removes your most recent <em>unnamed</em> pin</span></div>
       <div class="pintypes">
         <b>Types</b>
-        <span>● dot</span>
-        <span>🔥 fire</span>
-        <span>⛏️ mine</span>
-        <span>🏠 house</span>
-        <span>🕳️ cave</span>
+        <span><svg><use href="#ic-pin-dot"></use></svg>dot</span>
+        <span><svg><use href="#ic-pin-fire"></use></svg>fire</span>
+        <span><svg><use href="#ic-pin-mine"></use></svg>mine</span>
+        <span><svg><use href="#ic-pin-house"></use></svg>house</span>
+        <span><svg><use href="#ic-pin-cave"></use></svg>cave</span>
       </div>
     </div>
 
@@ -340,20 +399,20 @@ function positionMarkers(){
     el.style.top  = (ty + (+el.dataset.py) * scale) + "px";
   });
 }
-const PIN_ICON = {dot:"\u25CF", fire:"\uD83D\uDD25", mine:"\u26CF\uFE0F", house:"\uD83C\uDFE0", cave:"\uD83D\uDD73\uFE0F"};
+const PIN_ICON = {dot:"ic-pin-dot", fire:"ic-pin-fire", mine:"ic-pin-mine", house:"ic-pin-house", cave:"ic-pin-cave"};
 // Keyed on the prefab name the mod reports. A hull it doesn't know still draws as a
 // boat rather than vanishing, so a ship added in a later patch needs no change here.
 const VEHICLE = {
-  raft:       {icon:"\uD83D\uDEF6", label:"Raft",      size:11},
-  karve:      {icon:"\u26F5",             label:"Karve",     size:13},
-  vikingship: {icon:"\uD83D\uDEA2", label:"Longship",  size:16},
-  cart:       {icon:"\uD83D\uDED2", label:"Cart",      size:12},
+  raft:       {icon:"ic-raft",     label:"Raft",      size:15},
+  karve:      {icon:"ic-karve",    label:"Karve",     size:18},
+  vikingship: {icon:"ic-longship", label:"Longship",  size:22},
+  cart:       {icon:"ic-cart",     label:"Cart",      size:16},
 };
 function vehicleStyle(m){
   const v = VEHICLE[(m.name||"").toLowerCase()];
   if (v) return v;
   return m.kind === "cart" ? VEHICLE.cart
-                           : {icon:"\u26F5", label:m.name || "Boat", size:13};
+                           : {icon:"ic-karve", label:m.name || "Boat", size:18};
 }
 function buildMarkers(players, pinList, vehicles){
   const p = (players||[]).map(m =>
@@ -361,24 +420,24 @@ function buildMarkers(players, pinList, vehicles){
     + `<span class="dot"></span><span class="nm">${esc(m.name)}</span></div>`);
   const q = (pinList||[]).map(m =>
     `<div class="marker pin" data-px="${m.px}" data-py="${m.py}" title="${esc(m.owner||"")}">`
-    + `<span class="ic">${PIN_ICON[m.type] || PIN_ICON.dot}</span>`
+    + `<svg class="ic"><use href="#${PIN_ICON[m.type] || PIN_ICON.dot}"></use></svg>`
     + (m.text ? `<span class="nm">${esc(m.text)}</span>` : "") + `</div>`);
   // named on hover only -- a harbour with six boats would be a wall of text.
   // Hull size is drawn to scale so a longship reads as one without a label.
   const v = (vehicles||[]).map(m => {
     const st = vehicleStyle(m);
     return `<div class="marker veh" data-kind="${st.label.toLowerCase()}" data-px="${m.px}" data-py="${m.py}" title="${esc(st.label)}">`
-      + `<span class="ic" style="font-size:${st.size}px">${st.icon}</span></div>`;
+      + `<svg class="ic" style="width:${st.size}px;height:${st.size}px"><use href="#${st.icon}"></use></svg></div>`;
   });
   // Named, because the name is the whole point of a portal.
   const w = (PORTALS||[]).map(m =>
     `<div class="marker portal" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"unnamed portal")}">`
-    + `<span class="ic">\uD83C\uDF00</span>`
+    + `<svg class="ic"><use href="#ic-portal"></use></svg>`
     + (m.name ? `<span class="nm">${esc(m.name)}</span>` : "") + `</div>`);
   // Someone's gear is still lying here; the name matters more than the icon.
   const g = (GRAVES||[]).map(m =>
     `<div class="marker grave" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"grave")}${m.age>0?" · "+graveAge(m.age):""}">`
-    + `<span class="ic">\uD83E\uDEA6</span>`
+    + `<svg class="ic"><use href="#ic-grave"></use></svg>`
     + (m.name ? `<span class="nm">${esc(m.name)}</span>` : "") + `</div>`);
   document.getElementById("markers").innerHTML = p.concat(q).concat(v).concat(w).concat(g).join("");
   drawPortalLinks();
@@ -627,7 +686,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13v";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13w";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
