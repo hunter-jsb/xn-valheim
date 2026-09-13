@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
 <title>Portals — Xandaris Valheim</title>
-<meta name="description" content="An atlas of the server's portals: every hub and the wheel of places it reaches.">
+<meta name="description" content="An atlas of the server's portals: every hub and the places it reaches, drawn on the world.">
 <meta property="og:title" content="Xandaris Valheim — Portals">
-<meta property="og:description" content="Every hub and the wheel of places it reaches, linked now or one retag away.">
+<meta property="og:description" content="Every hub and the places it reaches, linked now or one retag away, drawn on the world.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -41,7 +41,7 @@
   @media (max-width:760px){ .brand{font-size:.8rem} }
 
   /* ---------- atlas ---------- */
-  .wrap{max-width:780px;margin:0 auto;padding:1.4rem .9rem 3rem}
+  .wrap{max-width:1180px;margin:0 auto;padding:1.4rem .9rem 3rem}
   h1{font-size:1.1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gold)}
   .sub{color:var(--muted);font-size:.8rem;margin-top:.25rem}
   .sub b{color:var(--ink);font-weight:600}
@@ -67,15 +67,69 @@
   .empty{color:var(--muted);font-size:.82rem;padding:.8rem 0}
   .foot{color:var(--muted);font-size:.72rem;margin-top:1.6rem;border-top:1px solid var(--line);padding-top:.8rem}
 
-  /* ---------- a hub and its wheel ---------- */
+  /* ---------- the diagram ---------- */
+  /* Screen-space canvas, HTML nodes placed by left/top: nothing crisp ever sits
+     under a CSS transform, which is the map's own rule. */
+  .stage{position:relative;margin-top:.9rem;height:clamp(480px,70vh,900px);
+    border:1px solid var(--line);border-radius:.7rem;overflow:hidden;background:#05070a;
+    cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+  .stage.drag{cursor:grabbing}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .net{position:absolute;inset:0;pointer-events:none}
+  .node{position:absolute;width:0;height:0;pointer-events:none;color:var(--ink);text-decoration:none}
+  .node .ic,.node .lb,.node .panel{pointer-events:auto}
+  .node .ic{position:absolute;left:-11px;top:-11px;width:22px;height:22px;overflow:visible;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.85))}
+  .node .lb{position:absolute;display:block;white-space:nowrap;text-align:center;line-height:1.2}
+  .node .t{display:block;font-size:.8rem;font-weight:700;color:#fff;
+    text-shadow:0 1px 3px #000,0 0 6px #000,0 0 6px #000}
+  .node .d{display:block;font-size:.68rem;color:#a7b6bd;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 3px #000,0 0 6px #000}
+  .node .dl{color:var(--unknown);font-weight:600}
+  .node.dial .ic{opacity:.66}
+  .node.loose .ic{opacity:.3}
+  .node.mini .lb{display:none}          /* no room at this zoom: the icon keeps the place */
+  .node.off{display:none}
+  .node:hover .t,.node.hl .t{color:var(--portal)}
+  .node:hover .ic,.node.hl .ic{filter:drop-shadow(0 0 6px rgba(111,216,230,.95));opacity:1}
+
+  /* a hub is a panel, not a dot: its name, its gate count, one chip per gate */
+  .node.hub{z-index:2}
+  /* the panel's containing block is a zero-width anchor: say max-content or every
+     chip wraps onto its own line */
+  .panel{position:absolute;width:max-content;min-width:108px;max-width:200px;background:rgba(14,21,24,.9);
+    border:1px solid #3a5a65;border-radius:.5rem;padding:.4rem .45rem .45rem;
+    box-shadow:0 3px 16px rgba(0,0,0,.65)}
+  .panel .ttl{display:flex;gap:.5rem;align-items:baseline}
+  .panel .ttl a{font-size:.84rem;font-weight:700;color:#fff;letter-spacing:.01em}
+  .panel .ttl a:hover{color:var(--portal);text-decoration:none}
+  .panel .ttl .n{margin-left:auto;font-size:.68rem;font-weight:600;color:var(--muted);white-space:nowrap}
+  .gates{display:flex;flex-wrap:wrap;gap:.22rem;margin-top:.38rem}
+  .chip{font-size:.7rem;font-weight:600;line-height:1;padding:.25rem .38rem;border-radius:.3rem;
+    border:1px solid transparent;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .chip.on{background:rgba(111,216,230,.14);border-color:rgba(111,216,230,.5);color:#bdf1f8}
+  .chip.free{background:#1b211f;border-color:#39423c;color:var(--muted)}
+  .chip:hover,.chip.hl{background:var(--portal);border-color:var(--portal);color:#06282d;text-decoration:none}
+
+  .mapui{position:absolute;right:.55rem;top:.55rem}
+  .mapui button{width:30px;height:30px;border-radius:.4rem;border:1px solid var(--line);
+    background:rgba(13,15,14,.82);color:var(--ink);font-size:1rem;line-height:1;cursor:pointer}
+  .mapui button:hover{border-color:var(--gold);color:var(--gold)}
+  .rose,.sbar{position:absolute;left:.65rem;color:var(--muted);font-size:.68rem;
+    letter-spacing:.06em;text-shadow:0 1px 3px #000}
+  .rose{top:.5rem;font-weight:600}
+  .sbar{bottom:.5rem;display:flex;align-items:flex-end;gap:.35rem}
+  .sline{display:block;height:5px;border:1px solid #8b968f;border-top:0}
+  .key{color:var(--muted);font-size:.72rem;margin-top:.5rem}
+  .key .k{display:inline-block;width:20px;border-top:2px solid var(--portal);
+    vertical-align:middle;margin-right:.15rem}
+  .key .k.dash{border-top:2px dashed #97c4d0;opacity:.75}
+
+  /* ---------- a hub's rows ---------- */
   .card{background:var(--card);border:1px solid var(--line);border-radius:.7rem;
     padding:.8rem .8rem .9rem;margin-bottom:.8rem}
   .card h3{font-size:.92rem;font-weight:600;color:#fff;display:flex;gap:.6rem;align-items:flex-start}
   .meta{color:var(--muted);font-size:.74rem;margin-top:.15rem;font-variant-numeric:tabular-nums}
-  .wheel{display:block;width:100%;max-width:440px;height:auto;margin:.35rem auto 0;
-    font-family:inherit;touch-action:manipulation}
-  .wheel a{cursor:pointer}
-  .wheel a:hover .lb{fill:var(--gold)}
   .spokes{list-style:none;display:grid;gap:.2rem;margin-top:.55rem;
     border-top:1px solid var(--line);padding-top:.55rem}
   .spokes a{display:flex;flex-wrap:wrap;gap:.4rem;align-items:baseline;color:var(--muted);
@@ -88,16 +142,22 @@
     white-space:nowrap}
   .spokes .on{color:var(--portal)}
   .spokes .dial{color:var(--unknown)}
+  /* a phone's whole diagram is 3 km across: a panel that stays desktop-wide would
+     swallow the places nearest the hub */
+  @media (max-width:560px){
+    .stage{height:clamp(460px,64vh,620px)}
+    .panel{max-width:150px;padding:.35rem .4rem .4rem}
+    .panel .ttl a{font-size:.78rem}
+    .chip{font-size:.66rem;padding:.2rem .32rem}
+    .node .t{font-size:.76rem}
+  }
 </style>
 </head>
 <body>
 
-<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
-  <symbol id="ic-portal" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
-    <path d="M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z" fill="#6fd8e6"/>
-    <path d="M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z" fill="#6fd8e6" fill-opacity=".38" stroke="none"/>
-  </symbol>
-</svg>
+<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
+<script src="map-core.js"></script>
+<script>MapCore.injectSprite(document.getElementById("icons"));</script>
 
 <nav class="nav">
   <span class="brand">Xandaris Valheim</span>
@@ -116,10 +176,23 @@
 
 <main class="wrap">
   <h1>Portals</h1>
-  <p class="sub" id="count">reading the world…</p>
+  <p class="sub" id="count">reading the world&#8230;</p>
   <p class="note" id="note"></p>
+
+  <!-- the rows below say all of this in text: to a screen reader the diagram is
+       decoration, so nothing in it is reachable by tab -->
+  <div class="stage" id="stage" aria-hidden="true">
+    <canvas id="cv"></canvas>
+    <div class="net" id="net"></div>
+    <div class="rose">N &#8593;</div>
+    <div class="mapui"><button id="fitBtn" type="button" tabindex="-1" title="Fit every portal">&#8962;</button></div>
+    <div class="sbar"><span class="sline" id="scaleBar"></span><span id="scaleTxt"></span></div>
+  </div>
+  <p class="key"><span class="k"></span> a standing link &#183; <span class="k dash"></span> one retag away
+    &#183; drag to pan, scroll to zoom</p>
+
   <div class="list" id="list"></div>
-  <p class="foot"><span id="stamp"></span> · a spoke opens the map on that portal ·
+  <p class="foot"><span id="stamp"></span> &#183; a node opens the map on that portal &#183;
     <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></p>
 </main>
 
@@ -127,13 +200,14 @@
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
 const SITE_R = 80;    // portals this close stand at one place
 const PIN_R  = 120;   // a house pin this close gives that place its name
-let WORLD = "", PINS = [], LAST = "", LAST_HEAD = "";
+const ZMAX   = 6;     // two sites are 80 m apart at the closest: past this there is nothing left to separate
+const esc = MapCore.esc, GEOM = MapCore.geom;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+let WORLD = "", PINS = [], LAST = "", LAST_HEAD = "", LAST_NET = "";
 
-function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function plural(n, w){ return n + " " + w + (n === 1 ? "" : "s"); }
-function r2(n){ return Math.round(n*10)/10; }
 
-// Valheim's +z is north, +x east, and a lone distance is from the world centre —
+// Valheim's +z is north, +x east, and a lone distance is from the world centre --
 // which is where everyone spawns, so it is the shared frame of reference.
 const DIRS = ["north","north-east","east","south-east","south","south-west","west","north-west"];
 const ABBR = ["N","NE","E","SE","S","SW","W","NW"];
@@ -143,7 +217,7 @@ function abbr(dx, dz){ return ABBR[Math.round(deg(dx, dz)/45) % 8]; }
 function span(d){ return d < 1000 ? Math.round(d) + " m" : (d/1000).toFixed(1) + " km"; }
 function where(p){
   const d = Math.hypot(p.x, p.z), xz = `${Math.round(p.x)}, ${Math.round(p.z)}`;
-  return `<span class="xz">${xz}</span> · ` + (d < 50 ? "the world centre" : `${bearing(p.x, p.z)}, ${span(d)}`);
+  return `<span class="xz">${xz}</span> &#183; ` + (d < 50 ? "the world centre" : `${bearing(p.x, p.z)}, ${span(d)}`);
 }
 function nameOf(p){ return p.name ? esc(p.name) : `<span class="un">unnamed</span>`; }
 function link(id){ return `index.html#portal=${encodeURIComponent(id)}`; }
@@ -154,16 +228,6 @@ function row(ends){
     + `<div class="nm">${ends.map(nameOf).join('<span class="arr">&#8596;</span>')}</div>`
     + `<div class="ends">${ends.map(e => `<span>${where(e)}</span>`).join("")}</div>`
     + `</div></a>`;
-}
-
-function parsePins(text){
-  return String(text||"").split(/\r?\n/).map(line => {
-    const f = line.split(",");
-    if(f.length < 6) return null;
-    const x = parseFloat(f[4]), z = parseFloat(f[5]);
-    if(!isFinite(x) || !isFinite(z)) return null;
-    return {type:f[2], text:f.slice(6).join(",").trim(), x, z};
-  }).filter(Boolean);
 }
 
 // ---------- sites ----------
@@ -181,7 +245,8 @@ function cluster(list){
   return [...by.values()].map(portals => {
     const x = portals.reduce((t, p) => t+p.x, 0)/portals.length;
     const z = portals.reduce((t, p) => t+p.z, 0)/portals.length;
-    return {portals, x, z, label: siteName(portals)};
+    const nm = siteName(portals), q = MapCore.toPx(x, z);
+    return {portals, x, z, px: q.px, py: q.py, pin: nm.pin, label: nm.label};
   });
 }
 // A house pin standing in the place names it; failing that the portals name
@@ -195,181 +260,305 @@ function siteName(portals){
       if(d < bd){ bd = d; best = pin; }
     }
   }
-  if(best) return best.text;
+  if(best) return {pin: best.text, label: best.text};
   const tags = [...new Set(portals.map(p => p.name).filter(Boolean))]
     .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-  return tags.length ? tags.join(" · ") : "unnamed site";
+  return {pin: null, label: tags.length ? tags.join(" · ") : "unnamed site"};
 }
 
-// ---------- wheel ----------
-const W = 400, C = W/2, HUB_R = 44, R0 = 86, R1 = 114, STEP = 24, LH = 12;
-const NARROW = "iljtfrI!.,;:'|·()[]/ ", WIDE = "mwMW@";
-// no measuring in an SVG we have not drawn yet, so estimate the ink a string takes
-function tw(s, size){
-  let u = 0;
-  for(const c of s) u += NARROW.includes(c) ? .34 : WIDE.includes(c) ? .92
-    : (c >= "A" && c <= "Z") ? .66 : .55;
-  return u*size;
+// ---------- the diagram ----------
+// The world as a reference chart with the network over it: the same screen-space
+// view maths as the map and the planning board, so a pan is a pan everywhere.
+const stage = document.getElementById("stage");
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const net = document.getElementById("net");
+const LAY = MapCore.layers(API, () => draw());
+let scale = 1, tx = 0, ty = 0, fit = 1, scratch = null, sctx = null;
+let NODES = [], SPOKES = [], SPOKE = new Map(), BBOX = null, HOVER = new Set(), FITTED = false;
+
+function sizeCanvas(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = Math.round(stage.clientWidth*dpr), H = Math.round(stage.clientHeight*dpr);
+  if(cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+  if(!scratch){ scratch = document.createElement("canvas"); sctx = scratch.getContext("2d"); }
+  if(scratch.width !== W || scratch.height !== H){ scratch.width = W; scratch.height = H; }
+  return dpr;
 }
-function wrap(text, size, maxW, maxLines){
-  const words = text.split(" "), out = [];
-  for(const w of words){
-    const last = out.length - 1;
-    if(last >= 0 && tw(out[last] + " " + w, size) <= maxW) out[last] += " " + w;
-    else out.push(w);
+let pending = false;
+function draw(){
+  if(pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; paint(); });
+}
+// The map's own raster pass -- base and fog, no forest, no builds -- then one
+// filter: grey, dim and washed cool, so the cyan network is the only colour here.
+function paint(){
+  const pix = sizeCanvas(), W = stage.clientWidth, H = stage.clientHeight;
+  const v = {scale, tx, ty, w: W, h: H, pix};
+  MapCore.drawRasters(sctx, v, LAY.imgs, {bg: "#05070a"});
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  ctx.filter = "grayscale(.85) contrast(1.45) brightness(.74)";
+  ctx.drawImage(scratch, 0, 0);
+  ctx.filter = "none";
+  ctx.globalCompositeOperation = "color";        // the land keeps its light, not its hue
+  ctx.globalAlpha = .6;
+  ctx.fillStyle = "#4b7ea8";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+  layout(v);
+  drawSpokes(v);
+  drawLeads(v);
+  scaleBar();
+}
+
+// Nodes are HTML at screen positions, so a chip is a real link and the text is
+// never scaled. Two passes: the places claim their ground first -- an icon stands
+// where the portal stands -- and the labels then compete for whatever air is left.
+function layout(v){
+  const W = stage.clientWidth, H = stage.clientHeight, EDGE = 180, PAD = 5, DRIFT = 74;
+  const rects = [{x0: 0, y0: 0, x1: 78, y1: 26},          // the rose
+                 {x0: W-46, y0: 0, x1: W, y1: 46},        // the fit button
+                 {x0: 0, y0: H-26, x1: 250, y1: H}];      // the scale bar
+  const over = (r, q) => r.x0 < q.x1+PAD && q.x0 < r.x1+PAD && r.y0 < q.y1+PAD && q.y0 < r.y1+PAD;
+  const hits = r => rects.some(q => over(r, q));
+  const boxAt = (n, ox, oy) => ({x0: n.sx+ox-n.w/2, y0: n.sy+oy-n.h/2,
+                                 x1: n.sx+ox+n.w/2, y1: n.sy+oy+n.h/2});
+  const put = (n, ox, oy) => {
+    n.box.style.left = Math.round(ox - n.w/2) + "px";
+    n.box.style.top  = Math.round(oy - n.h/2) + "px";
+    n.rect = boxAt(n, ox, oy);
+    n.lead = Math.hypot(ox, oy) > 34 ? {ox, oy} : null;
+    rects.push(n.rect);
+  };
+  for(const n of NODES){
+    n.sx = v.tx + n.site.px*v.scale;
+    n.sy = v.ty + n.site.py*v.scale;
+    n.vis = n.sx > -EDGE && n.sy > -EDGE && n.sx < W+EDGE && n.sy < H+EDGE;
+    n.rect = null; n.lead = null;
+    n.el.style.left = Math.round(n.sx) + "px";
+    n.el.style.top  = Math.round(n.sy) + "px";
+    n.el.classList.toggle("off", !n.vis);
+    n.el.classList.remove("mini");
   }
-  if(out.length > maxLines){ out.length = maxLines; out[maxLines-1] += "…"; }
-  return out.map(l => l.replace(/ ·(…?)$/, "$1"));
-}
-function boxOf(L){
-  const x0 = L.anchor === "start" ? L.x : L.anchor === "end" ? L.x - L.w : L.x - L.w/2;
-  return {x0: x0-2, x1: x0+L.w+2, y0: L.y-10, y1: L.y-10 + L.lines.length*LH + 2};
-}
-function clampXY(L){
-  const half = L.anchor === "start" ? 0 : L.anchor === "end" ? L.w : L.w/2;
-  L.x = Math.max(4 + half, Math.min(W - 4 - (L.w - half), L.x));
-  L.y = Math.max(13, Math.min(W + 5 - L.lines.length*LH, L.y));
-  return L;
-}
-function distToBox(cx, cy, b){
-  return Math.hypot(Math.max(b.x0-cx, 0, cx-b.x1), Math.max(b.y0-cy, 0, cy-b.y1));
-}
-function clearDisc(L){
-  for(let i = 0; i < 14 && distToBox(C, C, boxOf(L)) < HUB_R + 5; i++){
-    const d = Math.hypot(L.x-C, L.y-C) || 1;
-    L.x += (L.x-C)/d*4; L.y += (L.y-C)/d*4;
+  for(const n of NODES){                       // hubs first: a panel stands on its own ground
+    if(!n.vis) continue;
+    if(n.kind === "hub"){ if(n.w) put(n, 0, 0); continue; }
+    const ic = {x0: n.sx-13, y0: n.sy-13, x1: n.sx+13, y1: n.sy+13};
+    if(hits(ic)){ n.el.classList.add("off"); n.vis = false; continue; }  // a place already stands here
+    rects.push(ic);
   }
-}
-// A gate's tag stands beside its own spoke — never struck through by the line,
-// never lying on the disc. The offset is the box's own reach along the
-// perpendicular, so a wide tag on a slanted spoke still clears it.
-function mkTag(t, s){
-  const a = s.br*Math.PI/180;
-  let qx = Math.cos(a), qy = Math.sin(a);          // the clockwise side of the spoke
-  if(s.side < 0 || (!s.side && qy > 0)){ qx = -qx; qy = -qy; }
-  const w = tw(t, 10), off = Math.abs(qx)*w/2 + Math.abs(qy)*7 + 4;
-  const L = {lines: [{t, size: 10, fill: "#c2bcab"}], w, anchor: "middle", dy: 0,
-    x: C + s.ux*(HUB_R+12) + qx*off, y: C + s.uy*(HUB_R+12) + qy*off + 3};
-  L.ax = L.x; L.ay = L.y;
-  clearDisc(L);
-  return clampXY(L);
-}
-function mkLabel(lines, px, py, ux, uy, gap){
-  const w = Math.max(...lines.map(l => tw(l.t, l.size)));
-  let x = px + ux*gap, y = py + uy*gap;
-  let anchor = ux > .3 ? "start" : ux < -.3 ? "end" : "middle";
-  y += uy < -.5 ? -(lines.length-1)*LH - 4 : uy > .5 ? 8 : -(lines.length-1)*LH/2;
-  const room = anchor === "start" ? W-6-x : anchor === "end" ? x-6 : 2*Math.min(x-6, W-6-x);
-  // nothing like enough width out there: sit the block over or under the end instead
-  if(w > room){ anchor = "middle"; x = px; y = py + (uy < 0 ? -(lines.length*LH) - 5 : 17); }
-  return clampXY({lines, x, y, anchor, w, ax: px, ay: py, dy: 0});
-}
-// Spokes within ~20° of each other put their labels on top of one another;
-// nudge them apart, but never so far that a label drifts off its own spoke.
-function separate(labels){
-  for(let pass = 0; pass < 40; pass++){
-    let hit = false;
-    for(let i = 0; i < labels.length; i++) for(let j = i+1; j < labels.length; j++){
-      const A = boxOf(labels[i]), B = boxOf(labels[j]);
-      if(Math.min(A.x1,B.x1) <= Math.max(A.x0,B.x0)) continue;
-      const over = Math.min(A.y1,B.y1) - Math.max(A.y0,B.y0);
-      if(over <= 0) continue;
-      hit = true;
-      const step = Math.min(over/2 + .5, 3);
-      const up = (A.y0 + A.y1) <= (B.y0 + B.y1) ? -1 : 1;
-      nudge(labels[i], up*step); nudge(labels[j], -up*step);
+  for(const n of NODES){
+    if(!n.vis || n.kind === "hub" || !n.w) continue;
+    // an icon off the edge keeps its spoke, but a label out there belongs to nothing
+    if(n.sx < 0 || n.sy < 0 || n.sx > W || n.sy > H){ n.el.classList.add("mini"); continue; }
+    const gy = 13 + PAD + n.h/2 + 1, gx = 13 + PAD + n.w/2 + 1;
+    const reach = Math.abs(n.u.x)*n.w/2 + Math.abs(n.u.y)*n.h/2 + 14 + PAD;
+    const cand = [[0, gy], [0, -gy], [n.u.x*reach, n.u.y*reach], [gx, 0], [-gx, 0]];
+    // nothing beside the icon: step past whatever is in the way, up to a leader's length
+    for(const dir of [1, -1]){
+      let oy = dir*gy;
+      for(let i = 0; i < 6; i++){
+        const q = rects.find(r => over(boxAt(n, 0, oy), r));
+        if(!q){ cand.push([0, oy]); break; }
+        oy = (dir > 0 ? q.y1 + PAD + n.h/2 + 1 : q.y0 - PAD - n.h/2 - 1) - n.sy;
+        if(Math.abs(oy) > DRIFT) break;
+      }
     }
-    if(!hit) break;
+    let done = false;
+    for(const c of cand){
+      const ox = clamp(c[0], 6 + n.w/2 - n.sx, W - 6 - n.w/2 - n.sx);
+      const oy = clamp(c[1], 6 + n.h/2 - n.sy, H - 6 - n.h/2 - n.sy);
+      if(hits(boxAt(n, ox, oy))) continue;
+      put(n, ox, oy); done = true; break;
+    }
+    if(!done) n.el.classList.add("mini");
   }
 }
-function nudge(L, dy){
-  if(Math.abs(L.dy + dy) > 26) return;
-  L.dy += dy; L.y += dy;
-}
-function drawLabel(L){
-  const lead = Math.abs(L.dy) > 11
-    ? `<line x1="${r2(L.ax)}" y1="${r2(L.ay)}" x2="${r2(L.x)}" y2="${r2(L.y - 10 + L.lines.length*LH/2)}" stroke="#3c433c" stroke-width="1"/>` : "";
-  return lead + L.lines.map((l, i) =>
-    `<text class="lb" x="${r2(L.x)}" y="${r2(L.y + i*LH)}" text-anchor="${L.anchor}" font-size="${l.size}"`
-    + (l.bold ? ` font-weight="600"` : "") + ` fill="${l.fill}">${esc(l.t)}</text>`).join("");
-}
-
-// The wheel: north up, every spoke on its true bearing, length by rank of
-// distance so the far ends order themselves without swamping the near ones.
-function wheel(hub, sps){
-  const n = sps.length;
-  [...sps].sort((a, b) => a.d - b.d).forEach((s, i) => { s.len = n > 1 ? R0 + (R1-R0)*i/(n-1) : (R0+R1)/2; });
-  const ring = [...sps].sort((a, b) => a.br - b.br);
-  let run = 0, took = -1;
-  ring.forEach((s, i) => {
-    run = i && (s.br - ring[i-1].br) < 22 ? run + 1 : 0; s.lane = run;
-    // a tag takes the roomier of the two wedges beside its spoke, unless the
-    // spoke before it has already moved into that one
-    const plus = n < 2 ? 0 : (ring[(i+1) % n].br - s.br + 360) % 360;
-    const minus = n < 2 ? 0 : (s.br - ring[(i-1+n) % n].br + 360) % 360;
-    let w = plus >= minus ? i : (i-1+n) % n;
-    if(n > 1 && w === took && Math.max(plus, minus) < 30 && Math.min(plus, minus) > 10)
-      w = w === i ? (i-1+n) % n : i;
-    s.side = n < 2 ? 0 : w === i ? 1 : -1;
-    took = w;
-  });
-  if(n > 2 && ring[0].lane === 0 && ring[n-1].lane === 0 && ring[0].br + 360 - ring[n-1].br < 22)
-    ring[n-1].lane = 1;
-
-  const labels = [], parts = [];
-  for(const s of sps){
-    const a = s.br*Math.PI/180;
-    s.len += STEP*(s.lane % 3);
-    s.ux = Math.sin(a); s.uy = -Math.cos(a);
-    s.ex = C + s.ux*s.len; s.ey = C + s.uy*s.len;
-    s.gate = mkTag(s.kind === "dial" ? "dial " + s.tag : s.tag, s);
-    s.dest = mkLabel([{t: s.dst.label, size: 11, bold: 1, fill: "#ffffff"},
-                      {t: span(s.d) + " " + s.ab, size: 9.5, fill: "#9aa093"}],
-      s.ex, s.ey, s.ux, s.uy, 14);
-    labels.push(s.gate, s.dest);
+// a label that had to step away from its icon says which icon it belongs to
+function drawLeads(v){
+  const g = ctx;
+  g.setTransform(v.pix, 0, 0, v.pix, 0, 0);
+  g.setLineDash([]); g.lineWidth = 1; g.strokeStyle = "rgba(167,182,189,.5)";
+  g.beginPath();
+  for(const n of NODES){
+    if(!n.vis || !n.lead) continue;
+    const s = n.lead.oy >= 0 ? 1 : -1;
+    g.moveTo(n.sx, n.sy + s*13);
+    g.lineTo(n.sx + n.lead.ox, n.sy + n.lead.oy - s*n.h/2);
   }
-  separate(labels);
-  for(const s of sps) clearDisc(s.gate);
-  separate(labels);
-
-  for(const s of sps){
-    const dial = s.kind === "dial";
-    parts.push(`<line x1="${r2(C + s.ux*(HUB_R+2))}" y1="${r2(C + s.uy*(HUB_R+2))}" x2="${r2(s.ex)}" y2="${r2(s.ey)}"`
-      + (dial ? ` stroke="#767c6f" stroke-width="1.6" stroke-dasharray="5 5"` : ` stroke="#6fd8e6" stroke-width="2"`)
-      + ` stroke-linecap="round"/>`);
-    parts.push(`<a href="${link(s.target)}" tabindex="-1">`
-      + `<circle cx="${r2(s.ex)}" cy="${r2(s.ey)}" r="15" fill="transparent"/>`
-      + `<use href="#ic-portal" x="${r2(s.ex-9)}" y="${r2(s.ey-9)}" width="18" height="18"${dial ? ` opacity=".5"` : ""}/>`
-      + drawLabel(s.gate) + drawLabel(s.dest) + `</a>`);
-  }
-  // north is up: say so once, in the corner, where no spoke reaches
-  const rose = `<g opacity=".55"><path d="M${W-20} 40V20m0 0-4 6m4-6 4 6" fill="none" stroke="#9aa093"`
-    + ` stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`
-    + `<text x="${W-20}" y="15" text-anchor="middle" font-size="9" font-weight="600" fill="#9aa093">N</text></g>`;
-  const disc = wrap(hub.label, 9.5, 70, 4);
-  const top = C - (disc.length-1)*5;
-  return `<svg class="wheel" viewBox="0 0 ${W} ${W}" aria-hidden="true" focusable="false">`
-    + rose + parts.join("")
-    + `<circle cx="${C}" cy="${C}" r="${HUB_R}" fill="#1d2320" stroke="#6fd8e6" stroke-opacity=".55" stroke-width="1.5"/>`
-    + disc.map((t, i) => `<text x="${C}" y="${r2(top + i*10)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="#e7e2d4">${esc(t)}</text>`).join("")
-    + `</svg>`;
+  g.stroke();
 }
 
+// A spoke is the real line between two places: solid where the gates are linked,
+// dashed where one retag would open it.
+function drawSpokes(v){
+  const g = ctx;
+  g.setTransform(v.pix, 0, 0, v.pix, 0, 0);
+  g.lineCap = "round";
+  for(const s of SPOKES.slice().sort((a, b) => (HOVER.has(a.k)?1:0) - (HOVER.has(b.k)?1:0))){
+    const A = s.a.node, B = s.b.node;
+    if(!A || !B || (!A.vis && !B.vis)) continue;
+    const dx = B.sx-A.sx, dy = B.sy-A.sy, len = Math.hypot(dx, dy) || 1;
+    const u = {x: dx/len, y: dy/len};
+    const p = edge(A, u, 1), q = edge(B, u, -1);
+    const t0 = (p.x-A.sx)*u.x + (p.y-A.sy)*u.y;
+    const t1 = len - Math.hypot(B.sx-q.x, B.sy-q.y);
+    if(t1 - t0 < 4) continue;                  // the panel already covers the whole run
+    const on = HOVER.has(s.k), dial = s.kind === "dial";
+    g.setLineDash(dial ? [6, 6] : []);
+    g.lineWidth = dial ? (on ? 2.6 : 1.5) : (on ? 3.4 : 2.1);
+    g.strokeStyle = on ? "#e4feff" : dial ? "rgba(151,196,208,.62)" : "rgba(111,216,230,.85)";
+    g.shadowColor = "rgba(111,216,230,.85)";
+    g.shadowBlur = on ? 12 : 4;
+    g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.stroke();
+  }
+  g.shadowBlur = 0; g.setLineDash([]);
+}
+// leave from the panel's edge, or from just clear of the icon
+function edge(n, u, sgn){
+  const d = {x: u.x*sgn, y: u.y*sgn}, r = n.kind === "hub" ? n.rect : null;
+  let t = 13;
+  if(r && n.sx > r.x0 && n.sx < r.x1 && n.sy > r.y0 && n.sy < r.y1){
+    t = Infinity;
+    if(d.x >  1e-6) t = Math.min(t, (r.x1 + 3 - n.sx)/d.x);
+    if(d.x < -1e-6) t = Math.min(t, (r.x0 - 3 - n.sx)/d.x);
+    if(d.y >  1e-6) t = Math.min(t, (r.y1 + 3 - n.sy)/d.y);
+    if(d.y < -1e-6) t = Math.min(t, (r.y0 - 3 - n.sy)/d.y);
+  }
+  return {x: n.sx + d.x*t, y: n.sy + d.y*t};
+}
+function scaleBar(){
+  const mpp = GEOM.pixel/scale;                 // metres per screen pixel
+  let m = 10;
+  while(m/mpp < 60) m *= m.toString()[0] === "1" ? 2.5 : 2;
+  while(m/mpp > 150) m /= m.toString()[0] === "2" ? 2 : 2.5;
+  document.getElementById("scaleBar").style.width = Math.round(m/mpp) + "px";
+  document.getElementById("scaleTxt").textContent = m >= 1000 ? (m/1000) + " km" : Math.round(m) + " m";
+}
+// A label's size never changes with the zoom, so it is measured once per rebuild.
+function measure(){
+  for(const n of NODES){
+    n.el.classList.remove("mini", "off");
+    n.box = n.el.querySelector(".panel") || n.el.querySelector(".lb");
+    n.w = n.box ? n.box.offsetWidth : 0;
+    n.h = n.box ? n.box.offsetHeight : 0;
+  }
+}
+
+// ---------- the view ----------
+function computeFit(){ fit = Math.min(stage.clientWidth/GEOM.size, stage.clientHeight/GEOM.size)*0.98; }
+function zoomAt(cx, cy, f){
+  const ns = clamp(scale*f, fit*0.5, ZMAX);
+  tx = cx - (cx - tx)*(ns/scale);
+  ty = cy - (cy - ty)*(ns/scale);
+  scale = ns; draw();
+}
+// every portal on screen, with room around the edge for the labels
+function fitAll(){
+  computeFit();
+  const W = stage.clientWidth, H = stage.clientHeight;
+  if(!BBOX){ scale = fit; tx = (W - GEOM.size*scale)/2; ty = (H - GEOM.size*scale)/2; return draw(); }
+  const m = Math.min(84, W*0.12, H*0.12);
+  const bw = Math.max(BBOX.x1-BBOX.x0, 6), bh = Math.max(BBOX.y1-BBOX.y0, 6);
+  scale = clamp(Math.min((W-2*m)/bw, (H-2*m)/bh), fit*0.4, ZMAX);
+  tx = W/2 - (BBOX.x0 + bw/2)*scale;
+  ty = H/2 - (BBOX.y0 + bh/2)*scale;
+  draw();
+}
+const pts = new Map();
+let last = null, pinch = null, moved = 0;
+function pinchState(){
+  const [a, b] = [...pts.values()];
+  return {dist: Math.hypot(a.x-b.x, a.y-b.y), cx: (a.x+b.x)/2, cy: (a.y+b.y)/2};
+}
+stage.addEventListener("pointerdown", e => {
+  if(e.target.closest(".mapui")) return;
+  setHover(keysOf(e.target));                   // a touch is the only hover a phone has
+  pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if(pts.size === 1){ last = {x: e.clientX, y: e.clientY}; moved = 0; stage.classList.add("drag"); }
+  else if(pts.size === 2) pinch = pinchState();
+});
+addEventListener("pointermove", e => {
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if(pts.size === 2 && pinch){
+    const p = pinchState(), r = stage.getBoundingClientRect();
+    if(pinch.dist > 0) zoomAt(p.cx - r.left, p.cy - r.top, p.dist/pinch.dist);
+    pinch = p; return;
+  }
+  if(pts.size === 1 && last){
+    moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y);
+    tx += e.clientX - last.x; ty += e.clientY - last.y;
+    last = {x: e.clientX, y: e.clientY};
+    draw();
+  }
+});
+function endPtr(e){
+  pts.delete(e.pointerId);
+  if(pts.size < 2) pinch = null;
+  if(pts.size === 0){ last = null; stage.classList.remove("drag"); }
+  else { const p = [...pts.values()][0]; last = {x: p.x, y: p.y}; }
+}
+addEventListener("pointerup", endPtr);
+addEventListener("pointercancel", endPtr);
+// a drag that began on a node is a pan, not a click through to the map
+net.addEventListener("click", e => { if(moved > 6) e.preventDefault(); });
+stage.addEventListener("wheel", e => {
+  e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY*0.0015));
+}, {passive: false});
+stage.addEventListener("pointermove", e => { if(!pts.size) setHover(keysOf(e.target)); });
+stage.addEventListener("pointerleave", () => setHover([]));
+document.getElementById("fitBtn").onclick = fitAll;
+addEventListener("resize", () => { if(NODES.length) measure(); computeFit(); draw(); });
+
+const keysOf = el => { const t = el && el.closest && el.closest("[data-s]"); return t ? t.dataset.s.split(" ").filter(Boolean) : []; };
+// one spoke lit, and both the places it joins
+function setHover(keys){
+  const s = new Set(keys);
+  if(s.size === HOVER.size && [...s].every(k => HOVER.has(k))) return;
+  HOVER = s;
+  net.querySelectorAll(".hl").forEach(el => el.classList.remove("hl"));
+  for(const k of HOVER){
+    const sp = SPOKE.get(k); if(!sp) continue;
+    for(const site of [sp.a, sp.b]) if(site.node) site.node.el.classList.add("hl");
+    net.querySelectorAll('[data-s~="' + k + '"]').forEach(el => el.classList.add("hl"));
+  }
+  draw();
+}
+
+// ---------- the hub, as a node and as rows ----------
+function panel(site, sps){
+  const rank = g => { const i = sps.findIndex(s => s.gate === g); return i < 0 ? 900 : i; };
+  const chip = g => {
+    const s = sps.find(x => x.gate === g);
+    return `<a class="chip ${s ? "on" : "free"}" href="${link(g.id)}" tabindex="-1"`
+      + (s ? ` data-s="${s.k}"` : "") + `>${esc(g.name || (s ? "untagged" : "free"))}</a>`;
+  };
+  const gates = site.portals.slice().sort((a, b) => rank(a) - rank(b));
+  return `<div class="panel"><div class="ttl">`
+    + `<a href="${link(site.portals[0].id)}" tabindex="-1">${site.pin ? esc(site.pin) : "Hub"}</a>`
+    + `<span class="n">${plural(site.portals.length, "gate")}</span></div>`
+    + `<div class="gates">${gates.map(chip).join("")}</div></div>`;
+}
 function hubCard(hub, sps){
   const d = Math.hypot(hub.x, hub.z);
   const free = hub.portals.filter(p => !p.to).length;
-  const meta = `${plural(hub.portals.length, "gate")}${free ? ` (${free} free)` : ""} · `
-    + `<span class="xz">${Math.round(hub.x)}, ${Math.round(hub.z)}</span> · `
+  const meta = `${plural(hub.portals.length, "gate")}${free ? ` (${free} free)` : ""} &#183; `
+    + `<span class="xz">${Math.round(hub.x)}, ${Math.round(hub.z)}</span> &#183; `
     + (d < 50 ? "the world centre" : `${bearing(hub.x, hub.z)}, ${span(d)} out`);
   const one = sps.filter(s => s.kind === "link").length === 1;
   const li = s => `<li><a href="${link(s.target)}">`
     + `<span class="g">${s.kind === "dial" ? "dial " : ""}${esc(s.tag)}</span><span class="arr">&#8594;</span>`
-    + `<span class="to">${esc(s.dst.label)}</span> <span>· ${span(s.d)} ${s.ab}</span>`
+    + `<span class="to">${esc(s.dst.label)}</span> <span>&#183; ${span(s.d)} ${s.ab}</span>`
     + `<span class="st ${s.kind === "dial" ? "dial" : "on"}">`
     + (s.kind === "dial" ? "one retag away" : one ? "dialled now" : "linked") + `</span></a></li>`;
   return `<section class="card"><h3><svg class="ic"><use href="#ic-portal"></use></svg>`
     + `<span>${esc(hub.label)}</span></h3><p class="meta">${meta}</p>`
-    + (sps.length ? wheel(hub, sps) + `<ul class="spokes">${sps.map(li).join("")}</ul>`
+    + (sps.length ? `<ul class="spokes">${sps.map(li).join("")}</ul>`
                   : `<p class="empty">No gate here reaches anywhere yet.</p>`)
     + `</section>`;
 }
@@ -396,17 +585,22 @@ function render(list){
   const elsewhere = pairs.filter(([a, b]) => !atHub(a) && !atHub(b));
   const loose = list.filter(p => !twin(p) && (!p.name || !hubs.length));
 
-  const head = (WORLD ? `<b>${esc(WORLD)}</b> · ` : "") + plural(list.length, "portal")
-    + ` · ${plural(hubs.length, "hub")} · ${plural(pairs.length, "pair")} · ${loose.length} loose`;
+  const head = (WORLD ? `<b>${esc(WORLD)}</b> &#183; ` : "") + plural(list.length, "portal")
+    + ` &#183; ${plural(hubs.length, "hub")} &#183; ${plural(pairs.length, "pair")} &#183; ${loose.length} loose`;
   if(head !== LAST_HEAD){ document.getElementById("count").innerHTML = head; LAST_HEAD = head; }
 
-  let html = "";
+  // ---- spokes ----
+  const spokes = [], touching = new Map(), hubSpokes = new Map();
+  const add = s => {
+    s.k = "s" + spokes.length; spokes.push(s);
+    for(const site of [s.a, s.b]) (touching.get(site) || touching.set(site, []).get(site)).push(s);
+  };
   for(const hub of hubs){
     const sps = [];
     for(const g of hub.portals){
       const q = twin(g); if(!q) continue;
       const dst = siteOf.get(q.id); if(dst === hub) continue;
-      sps.push({kind: "link", tag: g.name || "untagged", dst, target: g.id});
+      sps.push({kind: "link", tag: g.name || "untagged", gate: g, dst, target: g.id});
     }
     for(const p of dials){
       const dst = siteOf.get(p.id); if(dst === hub) continue;
@@ -415,10 +609,69 @@ function render(list){
     for(const s of sps){
       const dx = s.dst.x - hub.x, dz = s.dst.z - hub.z;
       s.d = Math.hypot(dx, dz); s.br = deg(dx, dz); s.ab = abbr(dx, dz);
+      s.a = hub; s.b = s.dst;
     }
     sps.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "link" ? -1 : 1) || a.d - b.d);
-    html += hubCard(hub, sps);
+    sps.forEach(add);
+    hubSpokes.set(hub, sps);
   }
+  // a pair that touches no hub is its own short line, labelled at both ends
+  for(const [a, b] of elsewhere){
+    const A = siteOf.get(a.id), B = siteOf.get(b.id); if(A === B) continue;
+    const dx = B.x - A.x, dz = B.z - A.z;
+    add({kind: "pair", tag: a.name || b.name || "untagged", a: A, b: B,
+         d: Math.hypot(dx, dz), br: deg(dx, dz), ab: abbr(dx, dz), target: a.id});
+  }
+
+  // ---- nodes: a panel per hub, an icon and two lines per remote place ----
+  const nodes = [];
+  for(const site of sites){
+    const sps = touching.get(site) || [], p0 = site.portals[0];
+    if(site.portals.length > 1){
+      nodes.push({site, kind: "hub", pri: 0, d: 0, html: panel(site, hubSpokes.get(site) || [])});
+      continue;
+    }
+    const ico = `<svg class="ic"><use href="#ic-portal"></use></svg>`;
+    if(!sps.length){
+      nodes.push({site, kind: "loose", pri: 3, d: Math.hypot(site.x, site.z), keys: [],
+                  href: link(p0.id), title: p0.name || "untagged", html: ico});
+      continue;
+    }
+    const dial = sps.every(s => s.kind === "dial");
+    const o = sps[0].a === site ? sps[0].b : sps[0].a;
+    const d = Math.hypot(site.x-o.x, site.z-o.z), ab = abbr(site.x-o.x, site.z-o.z);
+    nodes.push({site, kind: dial ? "dial" : "rem", pri: dial ? 2 : 1, d,
+      keys: sps.map(s => s.k), href: link(p0.id), title: site.pin || p0.name || "untagged",
+      html: ico + `<span class="lb"><span class="t">${dial ? `<span class="dl">dial </span>` : ""}`
+        + `${esc(p0.name || sps[0].tag)}</span><span class="d">${span(d)} ${ab}</span></span>`});
+  }
+  nodes.sort((a, b) => a.pri - b.pri || a.d - b.d);
+
+  const netHTML = nodes.map((n, i) => n.kind === "hub"
+    ? `<div class="node hub" id="n${i}">${n.html}</div>`
+    : `<a class="node ${n.kind}" id="n${i}" href="${n.href}" tabindex="-1" data-s="${n.keys.join(" ")}"`
+      + ` title="${esc(n.title)}">${n.html}</a>`).join("");
+  const sig = netHTML + "|" + sites.map(s => Math.round(s.px) + "," + Math.round(s.py)).join(";");
+  if(sig !== LAST_NET){
+    LAST_NET = sig;
+    net.innerHTML = netHTML;
+    NODES = nodes; SPOKES = spokes; SPOKE = new Map(spokes.map(s => [s.k, s]));
+    nodes.forEach((n, i) => {
+      n.el = document.getElementById("n" + i);
+      n.site.node = n;
+      const sp = (touching.get(n.site) || [])[0];
+      const o = sp ? (sp.a === n.site ? sp.b : sp.a) : null;     // a label steps away from its hub
+      const dx = o ? n.site.px - o.px : 0, dy = o ? n.site.py - o.py : 1, L = Math.hypot(dx, dy) || 1;
+      n.u = {x: dx/L, y: dy/L};
+    });
+    measure();
+    BBOX = sites.length ? sites.reduce((b, s) => ({x0: Math.min(b.x0, s.px), y0: Math.min(b.y0, s.py),
+      x1: Math.max(b.x1, s.px), y1: Math.max(b.y1, s.py)}), {x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9}) : null;
+    if(!FITTED && sites.length){ FITTED = true; fitAll(); } else draw();
+  }
+
+  let html = "";
+  for(const hub of hubs) html += hubCard(hub, hubSpokes.get(hub) || []);
   if(hubs.length) html = `<h2>${hubs.length === 1 ? "Hub" : "Hubs"}</h2>` + html;
   if(elsewhere.length) html += `<h2>Elsewhere</h2><div class="rows">${elsewhere.map(row).join("")}</div>`;
   if(loose.length) html += `<h2>Loose</h2><div class="rows">${loose.map(p => row([p])).join("")}</div>`;
@@ -427,16 +680,15 @@ function render(list){
   if(html !== LAST){ el.innerHTML = html; LAST = html; }   // untouched DOM, so no flicker on the minute
 }
 
+// One /state carries the portals, the pins and the fog's revision; the fog itself
+// is megabytes, so it is refetched only when the server says it moved.
+let FOG_REV = null;
 async function load(){
   try{
-    const [r, pins] = await Promise.all([
-      fetch(API + "/portals", {cache:"no-store"}),
-      fetch(API + "/pins", {cache:"no-store"}).then(x => x.ok ? x.text() : null).catch(() => null)
-    ]);
-    if(!r.ok) throw new Error("portals " + r.status);
-    const j = await r.json();
-    if(pins !== null) PINS = parsePins(pins);      // no pins: sites still name themselves by tag
-    render(j.portals || []);
+    const s = await MapCore.fetchState(API);
+    PINS = MapCore.parsePins(s.pins);
+    if(s.rev && s.rev.fog !== FOG_REV){ FOG_REV = s.rev.fog; LAY.load("fog", "/fog", FOG_REV); }
+    render(((s.portals || {}).portals) || []);
     document.getElementById("note").textContent = "";
     document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
   }catch(e){
@@ -446,10 +698,9 @@ async function load(){
 }
 
 (async () => {
-  try{
-    const c = await fetch(API + "/config", {cache:"no-store"}).then(r => r.json());
-    WORLD = c.world_name || "";
-  }catch(e){}
+  computeFit(); fitAll();                 // the whole world until the portals say otherwise
+  LAY.loadBase();
+  try{ WORLD = (await MapCore.fetchConfig(API)).world || ""; }catch(e){}
   await load();
   setInterval(() => { if(document.visibilityState === "visible") load(); }, 60000);
   document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") load(); });
