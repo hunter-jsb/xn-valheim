@@ -87,7 +87,7 @@ function layers(base, onLoad){
   }
   return {imgs, rev, ready, load, whenReady, sync,
           loadBase: () => load("base", BASE_TEX, "4k"),
-          loadChart: () => load("chart", "/chart", "1")};   // flat biome chart, one per world; bump if it changes
+          loadChart: () => load("chart", "/chart", "2")};   // flat biome chart, one per world; bump when its rules change
 }
 
 // ---------- rasters ----------
