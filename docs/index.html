@@ -123,6 +123,7 @@
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{width:16px;height:16px}
   .marker.portal .nm{color:#9fe8f2}
+  .marker.portal.crowd .nm{display:none}
   /* arriving from a link, the eye needs telling where it landed */
   .marker.portal.hl::after{content:"";position:absolute;left:50%;top:8px;width:18px;height:18px;
     margin:-9px 0 0 -9px;border-radius:50%;border:2px solid #9fe8f2;pointer-events:none;
@@ -412,6 +413,16 @@ function positionMarkers(){
     el.style.left = (tx + (+el.dataset.px) * scale) + "px";
     el.style.top  = (ty + (+el.dataset.py) * scale) + "px";
   });
+  // Portals cluster at a base, and four names on one spot read as none. When a
+  // portal's label would sit on one already shown, it keeps its icon and loses
+  // its name; zooming in spreads them out again, and the atlas lists them all.
+  const kept = [];
+  document.querySelectorAll("#markers .marker.portal").forEach(el => {
+    const x = tx + (+el.dataset.px) * scale, y = ty + (+el.dataset.py) * scale;
+    const crowded = kept.some(k => Math.abs(k.x - x) < 44 && Math.abs(k.y - y) < 26);
+    el.classList.toggle("crowd", crowded);
+    if(!crowded) kept.push({x, y});
+  });
 }
 const PIN_ICON = {dot:"ic-pin-dot", fire:"ic-pin-fire", mine:"ic-pin-mine", house:"ic-pin-house", cave:"ic-pin-cave"};
 // Keyed on the prefab name the mod reports. A hull it doesn't know still draws as a
@@ -700,7 +711,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13y";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13z";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
