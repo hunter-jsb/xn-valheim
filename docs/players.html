@@ -142,6 +142,10 @@ function ago(secs){
   return Math.round(d/86400) + " d ago";
 }
 
+// last_seen 0 is a name the world knows without a session behind it: a builder
+// whose work stands but who has not logged in since the tally began.
+function seen(t){ return t ? "last seen " + ago(t) : "not seen yet"; }
+
 function fig(v, k, cls){
   return `<div class="fig${cls ? " " + cls : ""}"><div class="v">${v}</div><div class="k">${k}</div></div>`;
 }
@@ -151,7 +155,7 @@ function card(p){
   const nil = n => n ? "" : "nil";
   return `<div class="card${on ? " on" : ""}">`
     + `<div class="chead"><span class="dot"></span><span class="nm">${esc(p.name || "unnamed")}</span>`
-    + `<span class="seen">${on ? "online now" : "last seen " + ago(num(p.last_seen))}</span></div>`
+    + `<span class="seen">${on ? "online now" : seen(num(p.last_seen))}</span></div>`
     + `<div class="figs">`
     + fig(num(p.deaths), "deaths", nil(num(p.deaths)))
     + fig(num(p.joins), "joins", nil(num(p.joins)))
