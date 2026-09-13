@@ -8,37 +8,16 @@
 <meta property="og:title" content="Xandaris Valheim">
 <meta property="og:description" content="Live world map and status for the Xandaris Valheim server.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<link rel="stylesheet" href="site.css">
 <script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --bg:#0d0f0e;--card:#171b18;--ink:#e7e2d4;--muted:#9aa093;--line:#2a302a;
-    --gold:#c9a15a;--ok:#6faf68;--off:#a85757;--unknown:#8a8577;--nav:52px;--side:320px;
-  }
   html,body{height:100%}
   body{background:var(--bg);color:var(--ink);overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;line-height:1.5}
   a{color:var(--gold);text-decoration:none}
   a:hover{text-decoration:underline}
-
-  /* ---------- nav ---------- */
-  .nav{height:var(--nav);display:flex;align-items:center;gap:.75rem;padding:0 .9rem;
-    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
-  .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
-    white-space:nowrap;font-size:.95rem}
-  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;
-    overflow-x:auto;scrollbar-width:none}
-  /* seven links overflow a narrow phone; the bar swipes, but a scrollbar inside a
-     52px row eats the links it is there to reveal */
-  .navlinks::-webkit-scrollbar{display:none}
-  .navlinks a{color:var(--ink);white-space:nowrap}
-  .navlinks a:hover{color:var(--gold)}
-  /* the pages of this site, then a rule, then the links that leave it */
-  .navlinks .ext{display:flex;gap:1.1rem;padding-left:1.1rem;border-left:1px solid var(--line)}
-  .navlinks .ext a{color:var(--muted)}
-  .navlinks .ext a::after{content:"\2197";font-size:.7em;margin-left:.25em;opacity:.7}
-  .navlinks a.here{color:var(--gold)}
 
   /* ---------- app shell ---------- */
   .app{display:flex;height:calc(100dvh - var(--nav));position:relative}
@@ -167,7 +146,6 @@
   .types b{color:var(--ink);font-weight:600}
   @media (max-width:760px){
     .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.6)}
-    .brand{font-size:.8rem}
   }
 </style>
 </head>
@@ -177,20 +155,8 @@
 <svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
 <script>MapCore.injectSprite(document.getElementById("icons"));</script>
 
-<nav class="nav">
-  <span class="brand">Xandaris Valheim</span>
-  <div class="navlinks">
-    <a class="here" href="index.html">Map</a>
-    <a href="portals.html">Portals</a>
-    <a href="plan.html">Plan</a>
-    <a href="players.html">Players</a>
-    <span class="ext">
-      <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
-      <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
-      <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
-    </span>
-  </div>
-</nav>
+<nav class="nav" data-page="index"></nav>
+<script>MapCore.nav();</script>
 
 <div class="app">
   <aside class="sidebar" id="sidebar">
@@ -542,7 +508,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13zb";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13zc";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 const GEOM = MapCore.geom;
 

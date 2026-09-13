@@ -8,37 +8,17 @@
 <meta property="og:title" content="Xandaris Valheim — Portals">
 <meta property="og:description" content="Every hub and the places it reaches, linked now or one retag away, drawn on the world.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<link rel="stylesheet" href="site.css">
+<script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-  :root{
-    --bg:#0d0f0e;--card:#171b18;--ink:#e7e2d4;--muted:#9aa093;--line:#2a302a;
-    --gold:#c9a15a;--ok:#6faf68;--off:#a85757;--unknown:#8a8577;--nav:52px;--portal:#6fd8e6;
-  }
+  :root{--portal:#6fd8e6}   /* the portal blue: this page alone paints with it */
   html{background:var(--bg)}
   body{background:var(--bg);color:var(--ink);min-height:100%;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;line-height:1.5}
   a{color:var(--gold);text-decoration:none}
   a:hover{text-decoration:underline}
-
-  /* ---------- nav (same as the map) ---------- */
-  .nav{height:var(--nav);display:flex;align-items:center;gap:.75rem;padding:0 .9rem;
-    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
-  .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
-    white-space:nowrap;font-size:.95rem}
-  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;
-    overflow-x:auto;scrollbar-width:none}
-  /* seven links overflow a narrow phone; the bar swipes, but a scrollbar inside a
-     52px row eats the links it is there to reveal */
-  .navlinks::-webkit-scrollbar{display:none}
-  .navlinks a{color:var(--ink);white-space:nowrap}
-  .navlinks a:hover{color:var(--gold)}
-  /* the pages of this site, then a rule, then the links that leave it */
-  .navlinks .ext{display:flex;gap:1.1rem;padding-left:1.1rem;border-left:1px solid var(--line)}
-  .navlinks .ext a{color:var(--muted)}
-  .navlinks .ext a::after{content:"\2197";font-size:.7em;margin-left:.25em;opacity:.7}
-  .navlinks a.here{color:var(--gold)}
-  @media (max-width:760px){ .brand{font-size:.8rem} }
 
   /* ---------- atlas ---------- */
   .wrap{max-width:1180px;margin:0 auto;padding:1.4rem .9rem 3rem}
@@ -156,23 +136,10 @@
 <body>
 
 <svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
-<script src="map-core.js"></script>
 <script>MapCore.injectSprite(document.getElementById("icons"));</script>
 
-<nav class="nav">
-  <span class="brand">Xandaris Valheim</span>
-  <div class="navlinks">
-    <a href="index.html">Map</a>
-    <a class="here" href="portals.html">Portals</a>
-    <a href="plan.html">Plan</a>
-    <a href="players.html">Players</a>
-    <span class="ext">
-      <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
-      <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
-      <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
-    </span>
-  </div>
-</nav>
+<nav class="nav" data-page="portals"></nav>
+<script>MapCore.nav();</script>
 
 <main class="wrap">
   <h1>Portals</h1>

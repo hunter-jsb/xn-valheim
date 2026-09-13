@@ -318,9 +318,30 @@ function ago(iso){
 }
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
+// ---------- the site header ----------
+// Four pages wear the same bar, so a link added here reaches all of them; the
+// rules it needs are in site.css.
+const NAV_PAGES = [["index", "Map"], ["portals", "Portals"], ["plan", "Plan"], ["players", "Players"]];
+const NAV_EXT = [["https://xnmc.statuspage.io", "Status"],
+                 ["https://discord.gg/UDGfVrTQs6", "Discord"],
+                 ["https://github.com/hunter-jsb/valheim-webmap", "Map mod"]];
+// current defaults to the nav element's data-page
+function nav(current, el){
+  el = el || document.querySelector("nav.nav");
+  if(!el) return null;
+  current = current || el.dataset.page || "";
+  const mark = p => p === current ? ' class="here" aria-current="page"' : "";
+  el.innerHTML = '<span class="brand">Xandaris Valheim</span><div class="navlinks">'
+    + NAV_PAGES.map(([p, label]) => `<a${mark(p)} href="${p}.html">${label}</a>`).join("")
+    + '<span class="ext">'
+    + NAV_EXT.map(([href, label]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`).join("")
+    + '</span></div>';
+  return el;
+}
+
 return {geom, setGeom, toPx, toWorld, PLAN_ZOOM, MAX_ZOOM,
         api, fetchJSON, fetchState, fetchConfig, layers, BASE_TEX,
         drawRasters, kindOf, ORDER, shade, parsePieces, filterExplored, drawPieces,
         ICONS, spriteSVG, injectSprite, iconPaths, VEHICLE, vehicleStyle, PIN_ICON,
-        parsePins, ago, esc};
+        parsePins, ago, esc, nav};
 })();
