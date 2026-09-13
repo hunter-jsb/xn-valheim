@@ -54,7 +54,7 @@
   .cards{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
   .card{background:var(--card);border:1px solid var(--line);border-radius:.6rem;padding:.75rem .85rem}
   .card.on{border-color:#2f4b2e}
-  .chead{display:flex;align-items:center;gap:.45rem}
+  .chead{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap}
   .chead .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--unknown);flex:0 0 auto}
   .card.on .chead .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
   .chead .nm{font-size:.95rem;font-weight:700;color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -142,9 +142,9 @@ function ago(secs){
   return Math.round(d/86400) + " d ago";
 }
 
-// last_seen 0 is a name the world knows without a session behind it: a builder
-// whose work stands but who has not logged in since the tally began.
-function seen(t){ return t ? "last seen " + ago(t) : "not seen yet"; }
+// last_seen 0 is a name the sweep found on a grave or a build without ever
+// seeing its owner online: no session behind it, so no elapsed time to show.
+function seen(t){ return t ? "last seen " + ago(t) : "not seen since the tally began"; }
 
 function fig(v, k, cls){
   return `<div class="fig${cls ? " " + cls : ""}"><div class="v">${v}</div><div class="k">${k}</div></div>`;
