@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
+<title>Portals — Xandaris Valheim</title>
+<meta name="description" content="Every portal on the Xandaris Valheim server, which pairs are linked, and where they stand.">
+<meta property="og:title" content="Xandaris Valheim — Portals">
+<meta property="og:description" content="Every portal on the server, which pairs are linked, and where they stand.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d0f0e;--card:#171b18;--ink:#e7e2d4;--muted:#9aa093;--line:#2a302a;
+    --gold:#c9a15a;--ok:#6faf68;--off:#a85757;--unknown:#8a8577;--nav:52px;--portal:#6fd8e6;
+  }
+  html{background:var(--bg)}
+  body{background:var(--bg);color:var(--ink);min-height:100%;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:var(--gold);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- nav (same as the map) ---------- */
+  .nav{height:var(--nav);display:flex;align-items:center;gap:.75rem;padding:0 .9rem;
+    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
+  .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
+    white-space:nowrap;font-size:.95rem}
+  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;
+    overflow-x:auto;scrollbar-width:none}
+  /* seven links overflow a narrow phone; the bar swipes, but a scrollbar inside a
+     52px row eats the links it is there to reveal */
+  .navlinks::-webkit-scrollbar{display:none}
+  .navlinks a{color:var(--ink);white-space:nowrap}
+  .navlinks a:hover{color:var(--gold)}
+  .navlinks a.here{color:var(--gold)}
+  @media (max-width:760px){ .brand{font-size:.8rem} }
+
+  /* ---------- atlas ---------- */
+  .wrap{max-width:780px;margin:0 auto;padding:1.4rem .9rem 3rem}
+  h1{font-size:1.1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gold)}
+  .sub{color:var(--muted);font-size:.8rem;margin-top:.25rem}
+  .sub b{color:var(--ink);font-weight:600}
+  .note{color:var(--off);font-size:.76rem;margin-top:.35rem}
+  .note:empty{display:none}
+  h2{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+    font-weight:600;margin:1.4rem 0 .55rem;border-top:1px solid var(--line);padding-top:.9rem}
+  .list{margin-top:1.2rem}
+  .rows{display:grid;gap:.5rem}
+  .row{display:flex;gap:.75rem;align-items:flex-start;background:var(--card);
+    border:1px solid var(--line);border-radius:.6rem;padding:.65rem .75rem;color:var(--ink)}
+  .row:hover{border-color:var(--gold);text-decoration:none}
+  .row .ic{width:19px;height:19px;flex:0 0 auto;margin-top:.15rem;overflow:visible;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.55))}
+  .bd{min-width:0;flex:1}
+  .nm{font-size:.9rem;font-weight:600;color:#fff;display:flex;flex-wrap:wrap;align-items:baseline;gap:.4rem}
+  .nm .arr{color:var(--portal);font-weight:400;font-size:1.05rem;line-height:1}
+  .nm .un{color:var(--muted);font-weight:400;font-style:italic}
+  /* the coordinates are the point of the row: readable, but the name leads */
+  .ends{margin-top:.25rem;display:grid;gap:.1rem;font-size:.74rem;color:var(--muted);
+    font-variant-numeric:tabular-nums}
+  .ends .xz{color:#c2bcab}
+  .empty{color:var(--muted);font-size:.82rem;padding:.8rem 0}
+  .foot{color:var(--muted);font-size:.72rem;margin-top:1.6rem;border-top:1px solid var(--line);padding-top:.8rem}
+</style>
+</head>
+<body>
+
+<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="ic-portal" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">
+    <path d="M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z" fill="#6fd8e6"/>
+    <path d="M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z" fill="#6fd8e6" fill-opacity=".38" stroke="none"/>
+  </symbol>
+</svg>
+
+<nav class="nav">
+  <span class="brand">Xandaris Valheim</span>
+  <div class="navlinks">
+    <a href="index.html">Map</a>
+    <a class="here" href="portals.html">Portals</a>
+    <a href="plan.html">Plan</a>
+    <a href="players.html">Players</a>
+    <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
+    <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
+    <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <h1>Portals</h1>
+  <p class="sub" id="count">reading the world…</p>
+  <p class="note" id="note"></p>
+  <div class="list" id="list"></div>
+  <p class="foot"><span id="stamp"></span> · a row opens the map on that portal ·
+    <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></p>
+</main>
+
+<script>
+const API = "https://valheim-proxy.hunterjsb.workers.dev";
+let WORLD = "", LAST = "";
+
+function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function plural(n, w){ return n + " " + w + (n === 1 ? "" : "s"); }
+
+// Valheim's +z is north, +x east, and every distance here is from the world
+// centre — which is where everyone spawns, so it is the shared frame of reference.
+const DIRS = ["north","north-east","east","south-east","south","south-west","west","north-west"];
+function bearing(x, z){ return DIRS[Math.round(((Math.atan2(x, z)*180/Math.PI + 360) % 360)/45) % 8]; }
+function span(d){ return d < 1000 ? Math.round(d) + " m" : (d/1000).toFixed(1) + " km"; }
+function where(p){
+  const d = Math.hypot(p.x, p.z), xz = `${Math.round(p.x)}, ${Math.round(p.z)}`;
+  return `<span class="xz">${xz}</span> · ` + (d < 50 ? "the world centre" : `${bearing(p.x, p.z)}, ${span(d)}`);
+}
+function nameOf(p){ return p.name ? esc(p.name) : `<span class="un">unnamed</span>`; }
+// Either end serves as the link target: the map fits the whole pair anyway.
+function row(ends){
+  return `<a class="row" href="index.html#portal=${encodeURIComponent(ends[0].id)}">`
+    + `<svg class="ic"><use href="#ic-portal"></use></svg><div class="bd">`
+    + `<div class="nm">${ends.map(nameOf).join('<span class="arr">&#8596;</span>')}</div>`
+    + `<div class="ends">${ends.map(e => `<span>${where(e)}</span>`).join("")}</div>`
+    + `</div></a>`;
+}
+
+function render(list){
+  const by = new Map(list.map(p => [p.id, p]));
+  const pairs = [], singles = [], seen = new Set();
+  for(const p of list){
+    if(seen.has(p.id)) continue;
+    const q = (p.to && p.to !== "0" && p.to !== 0) ? by.get(p.to) : null;
+    if(q && q.id !== p.id){ seen.add(p.id); seen.add(q.id); pairs.push([p, q]); }
+    else singles.push(p);
+  }
+  const key = p => (p.name || "￿").toLowerCase();       // untagged portals sort last
+  pairs.sort((a, b) => key(a[0]).localeCompare(key(b[0])) || key(a[1]).localeCompare(key(b[1])));
+  singles.sort((a, b) => key(a).localeCompare(key(b)));
+
+  document.getElementById("count").innerHTML =
+    (WORLD ? `<b>${esc(WORLD)}</b> · ` : "") + plural(list.length, "portal")
+    + ` · ${plural(pairs.length, "linked pair")} · ${singles.length} unlinked`;
+
+  let html = "";
+  if(pairs.length) html += `<h2>Linked pairs</h2><div class="rows">${pairs.map(row).join("")}</div>`;
+  if(singles.length) html += `<h2>Unlinked</h2><div class="rows">${singles.map(p => row([p])).join("")}</div>`;
+  if(!list.length) html = `<p class="empty">No portals standing in this world yet.</p>`;
+  const el = document.getElementById("list");
+  if(html !== LAST){ el.innerHTML = html; LAST = html; }   // untouched DOM, so no flicker on the minute
+}
+
+async function load(){
+  try{
+    const r = await fetch(API + "/portals", {cache:"no-store"});
+    if(!r.ok) throw new Error("portals " + r.status);
+    const j = await r.json();
+    render(j.portals || []);
+    document.getElementById("note").textContent = "";
+    document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    // keep whatever is on screen: a stale list beats an empty one
+    document.getElementById("note").textContent = "server unreachable — this list may be out of date";
+  }
+}
+
+(async () => {
+  try{
+    const c = await fetch(API + "/config", {cache:"no-store"}).then(r => r.json());
+    WORLD = c.world_name || "";
+  }catch(e){}
+  await load();
+  setInterval(() => { if(document.visibilityState === "visible") load(); }, 60000);
+  document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") load(); });
+})();
+</script>
+</body>
+</html>

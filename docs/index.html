@@ -26,9 +26,14 @@
     background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
   .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
     white-space:nowrap;font-size:.95rem}
-  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;overflow-x:auto}
+  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;
+    overflow-x:auto;scrollbar-width:none}
+  /* seven links overflow a narrow phone; the bar swipes, but a scrollbar inside a
+     52px row eats the links it is there to reveal */
+  .navlinks::-webkit-scrollbar{display:none}
   .navlinks a{color:var(--ink);white-space:nowrap}
   .navlinks a:hover{color:var(--gold)}
+  .navlinks a.here{color:var(--gold)}
 
   /* ---------- app shell ---------- */
   .app{display:flex;height:calc(100dvh - var(--nav));position:relative}
@@ -118,6 +123,11 @@
   #portalLinks line{stroke:#6fd8e6;stroke-opacity:.55;stroke-width:2;stroke-dasharray:8 6;vector-effect:non-scaling-stroke}
   .marker.portal .ic{width:16px;height:16px}
   .marker.portal .nm{color:#9fe8f2}
+  /* arriving from a link, the eye needs telling where it landed */
+  .marker.portal.hl::after{content:"";position:absolute;left:50%;top:8px;width:18px;height:18px;
+    margin:-9px 0 0 -9px;border-radius:50%;border:2px solid #9fe8f2;pointer-events:none;
+    animation:hlring 1s ease-out infinite}
+  @keyframes hlring{from{transform:scale(.5);opacity:1}to{transform:scale(3.4);opacity:0}}
   .marker.grave .ic{width:16px;height:16px}
   .marker.grave .nm{color:#d9c7a6}
   /* The forest layer is drawn twice, multiplied both times, which squares its
@@ -245,6 +255,10 @@
 <nav class="nav">
   <span class="brand">Xandaris Valheim</span>
   <div class="navlinks">
+    <a class="here" href="index.html">Map</a>
+    <a href="portals.html">Portals</a>
+    <a href="plan.html">Plan</a>
+    <a href="players.html">Players</a>
     <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
     <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
     <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
@@ -431,7 +445,7 @@ function buildMarkers(players, pinList, vehicles){
   });
   // Named, because the name is the whole point of a portal.
   const w = (PORTALS||[]).map(m =>
-    `<div class="marker portal" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"unnamed portal")}">`
+    `<div class="marker portal${HIGHLIGHT.has(m.id)?" hl":""}" data-id="${esc(m.id)}" data-px="${m.px}" data-py="${m.py}" title="${esc(m.name||"unnamed portal")}">`
     + `<svg class="ic"><use href="#ic-portal"></use></svg>`
     + (m.name ? `<span class="nm">${esc(m.name)}</span>` : "") + `</div>`);
   // Someone's gear is still lying here; the name matters more than the icon.
@@ -686,7 +700,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13w";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13x";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
@@ -859,6 +873,7 @@ async function boot(){
   }catch(e){}
   await tickFast();
   await tickSlow();
+  applyHash();                 // needs the portals list, which tickSlow fetches
   await tickVehicles();
   // visibility-gated so a background tab makes no requests
   setInterval(()=>{ if(document.visibilityState==="visible") tickFast(); }, 5000);
@@ -869,14 +884,66 @@ async function boot(){
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickFast(); });
 }
 
+// ---------- deep links ----------
+// #portal=<id> centres on a portal, on both ends when it is linked; #at=<x>,<z>[,<zoom>]
+// on world metres; #layers=a,b,c switches layers on. This is how other pages link in.
+const HIGHLIGHT = new Set();          // portal ids wearing the arrival ring
+let HL_T = 0, LAYERS_READY = false;
+let HASH_VIEW = /(^|[#&])(portal|at)=/.test(location.hash);
+function hashParams(){
+  const out = {};
+  for(const part of location.hash.replace(/^#/,"").split("&")){
+    const i = part.indexOf("=");
+    if(i > 0) out[part.slice(0,i)] = decodeURIComponent(part.slice(i+1));
+  }
+  return out;
+}
+// as if the row had been clicked in the legend, so it sticks for this browser
+function showLayer(k){ if(HIDDEN.delete(k)){ applyHidden(); drawRaster(); } }
+function centerOn(px, py, z){
+  computeFit();
+  scale = clamp(z, fit*0.5, MAX_ZOOM);
+  tx = stage.clientWidth/2 - px*scale;
+  ty = stage.clientHeight/2 - py*scale;
+  apply();
+}
+function applyHash(){
+  const p = hashParams();
+  (p.layers||"").split(",").map(s=>s.trim()).filter(Boolean).forEach(showLayer);
+  const by = new Map((PORTALS||[]).map(q=>[q.id,q]));
+  const a = p.portal ? by.get(p.portal) : null;
+  let moved = false;
+  if(a){
+    showLayer("portal");
+    const b = a.to ? by.get(a.to) : null;
+    HIGHLIGHT.clear(); HIGHLIGHT.add(a.id); if(b) HIGHLIGHT.add(b.id);
+    // a pair only reads with both ends on screen; the floor keeps two portals
+    // standing side by side from slamming the view to maximum zoom
+    if(b) fitBox(Math.min(a.px,b.px), Math.min(a.py,b.py),
+                 Math.max(Math.abs(a.px-b.px),8), Math.max(Math.abs(a.py-b.py),8));
+    else centerOn(a.px, a.py, 20);
+    renderTiles();
+    clearTimeout(HL_T);
+    HL_T = setTimeout(()=>{ HIGHLIGHT.clear(); renderTiles(); }, 3000);
+    moved = true;
+  } else if(p.at){
+    const [x,z,zm] = p.at.split(",").map(Number);
+    if(isFinite(x) && isFinite(z)){ const q = toPx(x,z); centerOn(q.px, q.py, zm > 0 ? zm : 20); moved = true; }
+  }
+  // a hash naming something this world hasn't got must not leave it unfitted
+  if(!moved && HASH_VIEW){ HASH_VIEW = false; if(LAYERS_READY) fitExplored(true); }
+}
+addEventListener("hashchange", applyHash);
+
 computeFit(); fitView();
 // The base render is the whole world; it must never be visible without the fog
 // mask on top of it. Reveal only when both layers have decoded.
 let _layers = 0;
 function layerReady(){
   if(++_layers >= 2){
+    LAYERS_READY = true;
     inner.classList.add("ready");
-    fitExplored(true);
+    fitExplored(!HASH_VIEW);
   }
 }
 ["mapBase","mapFog"].forEach(id => {
