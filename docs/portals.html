@@ -655,12 +655,14 @@ function render(list){
 
 // One /state carries the portals, the pins and the fog's revision; the fog itself
 // is megabytes, so it is refetched only when the server says it moved.
-let FOG_REV = null;
+let FOG_REV = null, CHART_REV = null;
 async function load(){
   try{
     const s = await MapCore.fetchState(API);
     PINS = MapCore.parsePins(s.pins);
     if(s.rev && s.rev.fog !== FOG_REV){ FOG_REV = s.rev.fog; LAY.load("fog", "/fog", FOG_REV); }
+    // the chart is one image per world; its revision arrives with the state like the others
+    if(s.rev && s.rev.chart && s.rev.chart !== CHART_REV){ CHART_REV = s.rev.chart; LAY.load("chart", "/chart", CHART_REV); }
     render(((s.portals || {}).portals) || []);
     document.getElementById("note").textContent = "";
     document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
@@ -673,7 +675,6 @@ async function load(){
 (async () => {
   computeFit(); fitAll();                 // the whole world until the portals say otherwise
   LAY.loadBase();
-  LAY.loadChart();
   try{ WORLD = (await MapCore.fetchConfig(API)).world || ""; }catch(e){}
   await load();
   setInterval(() => { if(document.visibilityState === "visible") load(); }, 60000);

@@ -84,10 +84,10 @@ function layers(base, onLoad){
     const wantStruct = typeof o.structures === "function" ? o.structures() : o.structures;
     if(wantStruct && r.structures !== rev.structures){ rev.structures = r.structures; load("struct", "/structures", r.structures); }
     if(r.fog !== rev.fog){ rev.fog = r.fog; load("fog", "/fog", r.fog, o.onFog); }
+    if(o.chart && r.chart && r.chart !== rev.chart){ rev.chart = r.chart; load("chart", "/chart", r.chart); }
   }
   return {imgs, rev, ready, load, whenReady, sync,
-          loadBase: () => load("base", BASE_TEX, "4k"),
-          loadChart: () => load("chart", "/chart", "2")};   // flat biome chart, one per world; bump when its rules change
+          loadBase: () => load("base", BASE_TEX, "4k")};
 }
 
 // ---------- rasters ----------
