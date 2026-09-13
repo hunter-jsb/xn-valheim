@@ -18,9 +18,7 @@ const ROUTES = {
   // One document per tick: every small block the map polls, plus a revision per
   // large layer so the page asks for a layer only when its picture changed.
   "/state":    { ttl: 2 },
-  "/messages": { ttl: 0 },
   "/players":  { ttl: 0 },
-  "/pins":     { ttl: 0 },
   "/config":   { ttl: 60 },
   // The layers carry a content revision in ?v= from /state. A request that names a
   // revision can sit on the edge for an hour, since a changed picture has a new
@@ -28,13 +26,8 @@ const ROUTES = {
   "/fog":      { ttl: 5, image: true, versioned: true, vttl: 3600 },
   "/chart":    { ttl: 60, image: true, versioned: true, vttl: 86400 },   // one flat biome chart per world
   "/forest": { ttl: 60, image: true, versioned: true, vttl: 3600 },
-  "/forest/stats": { ttl: 30 },
   "/structures": { ttl: 30, image: true, versioned: true, vttl: 3600 },
-  "/structures/stats": { ttl: 10 },
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
-  "/vehicles": { ttl: 3 },        // boats and carts move; the mod sweeps once a minute while read
-  "/portals": { ttl: 30 },        // portals move only when someone rebuilds one
-  "/graves":  { ttl: 30 },        // a grave appears on a death and goes when it is emptied
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
