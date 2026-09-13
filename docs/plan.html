@@ -349,12 +349,17 @@ function render(g, W, H, v, o){
     g.globalCompositeOperation = op;
     try{ g.drawImage(img, sx*k, sy*k, sw*k, sh*k, 0, 0, W, H); }catch(e){}
   };
-  blit(RASTER.base, v.scale < 3, "source-over");
-  // multiplied twice, which squares the effect: dense woods go markedly darker
-  // while a thinned patch barely moves, so the difference reads at a glance
-  if(doc.layers.forest){ blit(RASTER.forest, true, "multiply"); blit(RASTER.forest, true, "multiply"); }
-  if(doc.layers.builds) blit(RASTER.struct, true, "source-over");
-  blit(RASTER.fog, true, "multiply");             // unexplored ground stays dark
+  // The base render is the whole world: it is never on screen without the fog
+  // mask over it, so until the fog has decoded the ground stays dark.
+  const fogIn = RASTER.fog && RASTER.fog.complete && RASTER.fog.naturalWidth;
+  if(fogIn){
+    blit(RASTER.base, v.scale < 3, "source-over");
+    // multiplied twice, which squares the effect: dense woods go markedly darker
+    // while a thinned patch barely moves, so the difference reads at a glance
+    if(doc.layers.forest){ blit(RASTER.forest, true, "multiply"); blit(RASTER.forest, true, "multiply"); }
+    if(doc.layers.builds) blit(RASTER.struct, true, "source-over");
+    blit(RASTER.fog, true, "multiply");             // unexplored ground stays dark
+  }
   g.globalCompositeOperation = "source-over";
   g.imageSmoothingEnabled = true;
 
