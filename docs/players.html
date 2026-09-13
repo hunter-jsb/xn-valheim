@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
+<title>Players — Xandaris Valheim</title>
+<meta name="description" content="What every player on the Xandaris Valheim server has done: deaths, distance, builds and what they left standing.">
+<meta property="og:title" content="Xandaris Valheim — Players">
+<meta property="og:description" content="What every player has done: deaths, distance, builds and what they left standing.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d0f0e;--card:#171b18;--ink:#e7e2d4;--muted:#9aa093;--line:#2a302a;
+    --gold:#c9a15a;--ok:#6faf68;--off:#a85757;--unknown:#8a8577;--nav:52px;
+  }
+  html{background:var(--bg)}
+  body{background:var(--bg);color:var(--ink);min-height:100%;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:var(--gold);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- nav (same as the map) ---------- */
+  .nav{height:var(--nav);display:flex;align-items:center;gap:.75rem;padding:0 .9rem;
+    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
+  .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
+    white-space:nowrap;font-size:.95rem}
+  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;
+    overflow-x:auto;scrollbar-width:none}
+  /* seven links overflow a narrow phone; the bar swipes, but a scrollbar inside a
+     52px row eats the links it is there to reveal */
+  .navlinks::-webkit-scrollbar{display:none}
+  .navlinks a{color:var(--ink);white-space:nowrap}
+  .navlinks a:hover{color:var(--gold)}
+  .navlinks a.here{color:var(--gold)}
+  @media (max-width:760px){ .brand{font-size:.8rem} }
+
+  /* ---------- roster ---------- */
+  .wrap{max-width:900px;margin:0 auto;padding:1.4rem .9rem 3rem}
+  h1{font-size:1.1rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gold)}
+  .sub{color:var(--muted);font-size:.8rem;margin-top:.25rem}
+  .sub b{color:var(--ink);font-weight:600}
+  .note{color:var(--off);font-size:.76rem;margin-top:.35rem}
+  .note:empty{display:none}
+
+  .sorts{display:flex;flex-wrap:wrap;gap:.4rem;margin:1.1rem 0 .9rem;align-items:center}
+  .sorts .lb{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-right:.1rem}
+  .sorts button{font-family:inherit;font-size:.74rem;color:var(--muted);cursor:pointer;
+    background:var(--card);border:1px solid var(--line);border-radius:.4rem;padding:.28rem .6rem}
+  .sorts button:hover{color:var(--ink);border-color:var(--gold)}
+  .sorts button.on{color:var(--gold);border-color:var(--gold)}
+
+  .cards{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:.6rem;padding:.75rem .85rem}
+  .card.on{border-color:#2f4b2e}
+  .chead{display:flex;align-items:center;gap:.45rem}
+  .chead .dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--unknown);flex:0 0 auto}
+  .card.on .chead .dot{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .chead .nm{font-size:.95rem;font-weight:700;color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chead .seen{margin-left:auto;font-size:.72rem;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+  .card.on .chead .seen{color:var(--ok)}
+
+  /* ten figures have to stay readable on a 400px phone: four to a row there, more when there is room */
+  .figs{margin-top:.7rem;display:grid;gap:.5rem .4rem;grid-template-columns:repeat(auto-fit,minmax(58px,1fr))}
+  .fig .v{font-size:1.02rem;font-weight:700;color:#fff;line-height:1.2;font-variant-numeric:tabular-nums}
+  .fig .k{font-size:.61rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);line-height:1.25}
+  .fig.nil .v{color:#565b53;font-weight:600}
+  .fig.warn .v,.fig.warn .k{color:var(--gold)}
+
+  .empty{color:var(--muted);font-size:.82rem;padding:.9rem 0}
+  .how{margin-top:1.8rem;border-top:1px solid var(--line);padding-top:.9rem}
+  .how h2{font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+  .how ul{list-style:none;margin-top:.5rem;display:grid;gap:.22rem;font-size:.73rem;color:var(--muted)}
+  .how b{color:#c2bcab;font-weight:600}
+  .foot{color:var(--muted);font-size:.72rem;margin-top:1.2rem}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="brand">Xandaris Valheim</span>
+  <div class="navlinks">
+    <a href="index.html">Map</a>
+    <a href="portals.html">Portals</a>
+    <a href="plan.html">Plan</a>
+    <a class="here" href="players.html">Players</a>
+    <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
+    <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
+    <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <h1>Players</h1>
+  <p class="sub" id="count">counting…</p>
+  <p class="note" id="note"></p>
+
+  <div class="sorts" id="sorts">
+    <span class="lb">Sort</span>
+    <button class="on" data-sort="seen">last seen</button>
+    <button data-sort="deaths">deaths</button>
+    <button data-sort="dist">distance</button>
+    <button data-sort="pieces">pieces</button>
+  </div>
+
+  <div id="list"></div>
+
+  <section class="how">
+    <h2>How these are counted</h2>
+    <ul>
+      <li><b>Deaths</b> — every time you have died in this world.</li>
+      <li><b>Joins</b> — sessions started, one per connection to the server.</li>
+      <li><b>Chat</b> — lines you have said in chat.</li>
+      <li><b>km</b> — metres covered on foot and by boat, with teleports excluded.</li>
+      <li><b>Hops</b> — portal trips and respawns: jumps over 100 m between one-second samples.</li>
+      <li><b>Pins</b> — map pins you have placed.</li>
+      <li><b>Pieces</b>, <b>portals</b> and <b>ships</b> — what is standing in the world right now with your name on it.</li>
+      <li><b>Graves</b> — your tombstones still out there holding gear.</li>
+      <li>Anything built before the tally started counts for nobody, so a builder who has not logged in since shows zero.</li>
+      <li>Time played is not tracked, and no figure here is a stand-in for it.</li>
+    </ul>
+  </section>
+
+  <p class="foot"><span id="stamp"></span> · <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></p>
+</main>
+
+<script>
+const API = "https://valheim-proxy.hunterjsb.workers.dev";
+let SORT = "seen", LAST = "", LOADED = false, DATA = [], SINCE = 0;
+
+function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function plural(n, w){ return n + " " + w + (n === 1 ? "" : "s"); }
+function num(v){ return Number.isFinite(+v) ? +v : 0; }
+
+// Coarse on purpose: this says how stale a tally is, never how long anyone played.
+function ago(secs){
+  const d = Math.max(0, Math.floor(Date.now()/1000) - secs);
+  if(d < 90) return "moments ago";
+  if(d < 5400) return Math.round(d/60) + " min ago";
+  if(d < 172800) return Math.round(d/3600) + " h ago";
+  return Math.round(d/86400) + " d ago";
+}
+
+function fig(v, k, cls){
+  return `<div class="fig${cls ? " " + cls : ""}"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+}
+
+function card(p){
+  const on = !!p.online, graves = num(p.graves);
+  const nil = n => n ? "" : "nil";
+  return `<div class="card${on ? " on" : ""}">`
+    + `<div class="chead"><span class="dot"></span><span class="nm">${esc(p.name || "unnamed")}</span>`
+    + `<span class="seen">${on ? "online now" : "last seen " + ago(num(p.last_seen))}</span></div>`
+    + `<div class="figs">`
+    + fig(num(p.deaths), "deaths", nil(num(p.deaths)))
+    + fig(num(p.joins), "joins", nil(num(p.joins)))
+    + fig(num(p.chat), "chat", nil(num(p.chat)))
+    + fig((num(p.dist_m)/1000).toFixed(1), "km", num(p.dist_m) ? "" : "nil")
+    + fig(num(p.hops), "hops", nil(num(p.hops)))
+    + fig(num(p.pins), "pins", nil(num(p.pins)))
+    + fig(num(p.pieces), "pieces", nil(num(p.pieces)))
+    + fig(num(p.portals), "portals", nil(num(p.portals)))
+    + fig(num(p.ships), "ships", nil(num(p.ships)))
+    + fig(graves, graves ? "gear still out" : "graves", graves ? "warn" : "nil")
+    + `</div></div>`;
+}
+
+const KEYS = {
+  seen: p => num(p.last_seen),
+  deaths: p => num(p.deaths),
+  dist: p => num(p.dist_m),
+  pieces: p => num(p.pieces),
+};
+
+function render(){
+  const key = KEYS[SORT] || KEYS.seen;
+  const rows = DATA.slice().sort((a, b) =>
+    key(b) - key(a) || num(b.last_seen) - num(a.last_seen)
+    || String(a.name || "").localeCompare(String(b.name || "")));
+
+  const on = rows.filter(p => p.online).length;
+  document.getElementById("count").innerHTML = `<b>${plural(rows.length, "player")}</b>`
+    + (on ? ` · ${on} online now` : "")
+    + (SINCE ? ` · tallied since ${new Date(SINCE*1000).toLocaleDateString(undefined, {month:"short", day:"numeric", year:"numeric"})}` : "");
+
+  const html = rows.length
+    ? `<div class="cards">${rows.map(card).join("")}</div>`
+    : `<p class="empty">No tallies yet — nobody has been seen since the count started.</p>`;
+  const el = document.getElementById("list");
+  if(html !== LAST){ el.innerHTML = html; LAST = html; }   // untouched DOM, so no flicker on the minute
+}
+
+async function load(){
+  try{
+    const r = await fetch(API + "/stats/players", {cache:"no-store"});
+    if(!r.ok) throw new Error("stats " + r.status);
+    const j = await r.json();
+    DATA = Array.isArray(j.players) ? j.players : [];
+    SINCE = num(j.since);
+    LOADED = true;
+    render();
+    document.getElementById("note").textContent = "";
+    document.getElementById("stamp").textContent = "updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    // keep whatever is on screen: a stale tally beats an empty page
+    if(LOADED){
+      document.getElementById("note").textContent = "stats unavailable — these tallies may be out of date";
+    }else{
+      document.getElementById("count").textContent = "stats unavailable";
+      document.getElementById("list").innerHTML = `<p class="empty">The server is not answering right now. This page retries every minute.</p>`;
+    }
+  }
+}
+
+document.getElementById("sorts").addEventListener("click", e => {
+  const b = e.target.closest("button[data-sort]");
+  if(!b || b.dataset.sort === SORT) return;
+  SORT = b.dataset.sort;
+  for(const x of document.querySelectorAll("#sorts button")) x.classList.toggle("on", x === b);
+  if(LOADED) render();
+});
+
+load();
+setInterval(() => { if(document.visibilityState === "visible") load(); }, 60000);
+document.addEventListener("visibilitychange", () => { if(document.visibilityState === "visible") load(); });
+</script>
+</body>
+</html>
