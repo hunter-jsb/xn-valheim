@@ -276,11 +276,10 @@
     </div>
 
     <h3>Layers</h3>
-    <p>Every row in the sidebar's <b>Layers</b> list is a switch: click it to hide that
-       layer, click again to bring it back. The choice stays in this browser. Builds are
-       drawn as shaded roofs; only when zoomed right in do they become a floor plan, and
-       hiding <b>floor plan when close</b> keeps the roofs at every zoom. A portal's dashed
-       line leads to the portal it is linked with. A grave marks gear still lying there.</p>
+    <p>Each row in the sidebar's <b>Layers</b> list is a switch, remembered by this browser.
+       Zoomed right in, builds turn from roofs into a floor plan; hide <b>floor plan when
+       close</b> to keep the roofs. Portal lines join linked pairs, and a grave is gear
+       still lying there.</p>
 
     <h3>Show yourself on the map</h3>
     <p>Press <b>M</b> in game and turn on <b>visible to other players</b>. Without it you
@@ -641,7 +640,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-12s";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13t";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
