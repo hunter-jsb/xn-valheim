@@ -26,6 +26,7 @@ const ROUTES = {
   // revision can sit on the edge for an hour, since a changed picture has a new
   // name; a request without one keeps the short TTL for pages that poll them plain.
   "/fog":      { ttl: 5, image: true, versioned: true, vttl: 3600 },
+  "/chart":    { ttl: 3600, image: true },   // one flat biome chart per world
   "/forest": { ttl: 60, image: true, versioned: true, vttl: 3600 },
   "/forest/stats": { ttl: 30 },
   "/structures": { ttl: 30, image: true, versioned: true, vttl: 3600 },
