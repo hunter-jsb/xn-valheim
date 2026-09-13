@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
+<title>Plan — Xandaris Valheim</title>
+<meta name="description" content="Draw trade routes, ore runs and base layouts on the live Xandaris Valheim world map, then share the plan as a link.">
+<meta property="og:title" content="Xandaris Valheim — Plan">
+<meta property="og:description" content="Draw on the live world map and share the plan with your party.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d0f0e;--card:#171b18;--ink:#e7e2d4;--muted:#9aa093;--line:#2a302a;
+    --gold:#c9a15a;--ok:#6faf68;--off:#a85757;--unknown:#8a8577;--nav:52px;--side:320px;
+  }
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);overflow:hidden;height:100dvh;display:flex;flex-direction:column;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  a{color:var(--gold);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- nav ---------- */
+  .nav{height:var(--nav);flex:0 0 auto;display:flex;align-items:center;gap:.75rem;padding:0 .9rem;
+    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:30}
+  .brand{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);
+    white-space:nowrap;font-size:.95rem}
+  .navlinks{margin-left:auto;display:flex;gap:1.1rem;font-size:.88rem;align-items:center;overflow-x:auto}
+  .navlinks a{color:var(--ink);white-space:nowrap}
+  .navlinks a:hover{color:var(--gold)}
+  .navlinks a.cur{color:var(--gold);font-weight:600}
+
+  /* ---------- tool bar ---------- */
+  .bar{flex:0 0 auto;display:flex;align-items:center;gap:.3rem;flex-wrap:wrap;padding:.4rem .6rem;
+    background:#12150f;border-bottom:1px solid var(--line);position:relative;z-index:20}
+  .bar .sep{width:1px;align-self:stretch;background:var(--line);margin:0 .35rem}
+  .bar .grp{display:flex;align-items:center;gap:.25rem}
+  .tbtn{height:34px;min-width:34px;padding:0 .45rem;border-radius:.45rem;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);font-size:.78rem;cursor:pointer;line-height:1;
+    display:flex;align-items:center;justify-content:center;gap:.3rem;white-space:nowrap}
+  .tbtn:hover{border-color:var(--gold);color:var(--gold)}
+  .tbtn svg{width:18px;height:18px;overflow:visible;pointer-events:none;flex:0 0 auto}
+  .tbtn.on{border-color:var(--gold);background:#241d10;color:var(--gold)}
+  .tbtn[disabled]{opacity:.35;pointer-events:none}
+  .sw{width:26px;height:26px;border-radius:50%;border:2px solid #0a0c0a;cursor:pointer;
+    box-shadow:0 0 0 1px var(--line)}
+  .sw.on{box-shadow:0 0 0 2px var(--gold)}
+  .wbtn{width:34px;height:34px;border-radius:.45rem;border:1px solid var(--line);background:var(--card);
+    cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .wbtn.on{border-color:var(--gold);background:#241d10}
+  .wbtn i{display:block;background:var(--ink);border-radius:99px}
+  .wbtn.on i{background:var(--gold)}
+  #labelIn{height:34px;width:150px;border-radius:.45rem;border:1px solid var(--line);background:#0f120e;
+    color:var(--ink);padding:0 .5rem;font:inherit;font-size:.8rem}
+  #labelIn:focus{outline:none;border-color:var(--gold)}
+  .bar .hide{display:none}
+
+  /* ---------- app shell ---------- */
+  .app{display:flex;flex:1 1 auto;min-height:0;position:relative}
+  .side{width:var(--side);flex:0 0 var(--side);background:#12150f;border-right:1px solid var(--line);
+    overflow-y:auto;padding:.9rem}
+  .side h3{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+    margin:0 0 .4rem}
+  .side .blk{margin-bottom:1rem}
+  .side input[type=text],.side textarea{width:100%;background:#0f120e;border:1px solid var(--line);
+    border-radius:.45rem;color:var(--ink);font:inherit;font-size:.85rem;padding:.45rem .55rem}
+  .side textarea{resize:vertical;min-height:74px;font-size:.8rem;line-height:1.45}
+  .side input[type=text]:focus,.side textarea:focus{outline:none;border-color:var(--gold)}
+  .side input#titleIn{font-size:.95rem;font-weight:600;color:#fff}
+  .row{display:flex;gap:.4rem;flex-wrap:wrap}
+  .row .tbtn{flex:1 1 auto}
+  .legend{display:grid;gap:.35rem .6rem;grid-template-columns:auto 1fr;align-items:center;
+    font-size:.76rem;color:var(--muted)}
+  .legend [data-layer]{cursor:pointer;user-select:none}
+  .legend span[data-layer]:not(.chip):hover{color:var(--ink)}
+  .legend [data-layer].off{opacity:.32;text-decoration:line-through}
+  .legend .chip{width:26px;height:20px;display:flex;align-items:center;justify-content:center}
+  .legend .chip svg{width:18px;height:18px;overflow:visible;pointer-events:none}
+  .legend .chip b{display:block;width:24px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.7)}
+  /* one chip for both ends of the same scale: dense woods through to bare ground */
+  .legend .chip b.grad{background:linear-gradient(90deg,#2f4a2a 0%,#3f5a37 45%,#8fae5c 100%)}
+  #linkOut{width:100%;background:#0f120e;border:1px solid var(--line);border-radius:.45rem;
+    color:var(--muted);font-family:"Cascadia Code",Consolas,monospace;font-size:.68rem;
+    padding:.4rem .5rem;margin-top:.4rem;text-overflow:ellipsis}
+  .note{color:var(--muted);font-size:.7rem;margin-top:.35rem;line-height:1.4}
+  .note b{color:var(--ink);font-weight:600}
+  .sidefoot{color:var(--muted);font-size:.72rem;margin-top:.9rem;border-top:1px solid var(--line);padding-top:.8rem}
+
+  /* ---------- map stage ---------- */
+  /* Everything crisp is blitted into one screen-space canvas per view change:
+     under a CSS transform Chrome GPU-scales a 1:1 raster bilinearly and caps how
+     finely it rasterises vectors, which turned 12 m pixels and thin lines into a
+     smear. Drawings live in world metres and are projected every frame instead. */
+  .stage{flex:1;position:relative;overflow:hidden;background:#0a0c0a;touch-action:none;cursor:crosshair}
+  .stage.pan{cursor:grab}
+  .stage.pan.dragging{cursor:grabbing}
+  .stage.erase{cursor:cell}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none}
+  .mapui{position:absolute;right:.7rem;bottom:.7rem;z-index:10;display:flex;flex-direction:column;gap:.35rem}
+  .mapui button{width:36px;height:36px;border-radius:.45rem;border:1px solid var(--line);
+    background:rgba(18,21,15,.9);color:var(--ink);font-size:1rem;cursor:pointer;line-height:1}
+  .mapui button:hover{border-color:var(--gold);color:var(--gold)}
+  .readout{position:absolute;left:.7rem;bottom:.7rem;z-index:10;display:flex;flex-direction:column;
+    gap:.3rem;align-items:flex-start;pointer-events:none;font-size:.72rem;color:var(--muted)}
+  .readout span{background:rgba(10,12,10,.78);border:1px solid var(--line);border-radius:.35rem;
+    padding:.2rem .45rem;white-space:nowrap}
+  .readout .dist{color:var(--gold)}
+  .readout .scalebar{display:flex;align-items:center;gap:.4rem}
+  .readout .scalebar i{display:block;height:6px;border:1px solid var(--ink);border-top:none;opacity:.8}
+  .banner{position:absolute;left:0;right:0;top:0;z-index:12;display:flex;align-items:center;gap:.6rem;
+    flex-wrap:wrap;padding:.5rem .7rem;background:rgba(20,16,8,.94);border-bottom:1px solid var(--gold);
+    font-size:.8rem}
+  .banner[hidden]{display:none}
+  .banner b{color:var(--gold)}
+  .sidebtn{display:none}
+
+  @media (max-width:860px){
+    .side{position:absolute;left:0;top:0;bottom:0;z-index:20;box-shadow:0 0 30px rgba(0,0,0,.6)}
+    .side[hidden]{display:none}
+    .sidebtn{display:flex}
+    .brand{font-size:.8rem}
+  }
+  @media (max-width:520px){
+    .side{width:100%;flex-basis:100%}
+    #labelIn{width:110px}
+    .bar{gap:.25rem;padding:.35rem .4rem}
+    .bar .sep{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- Marker and stamp icons, built from the same path data the canvas draws with,
+     so a stamp in the toolbar and the same stamp on the map are one source. -->
+<svg id="icons" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"></svg>
+
+<nav class="nav">
+  <span class="brand">Xandaris Valheim</span>
+  <div class="navlinks">
+    <a href="index.html">Map</a>
+    <a href="portals.html">Portals</a>
+    <a href="plan.html" class="cur" aria-current="page">Plan</a>
+    <a href="players.html">Players</a>
+    <a href="https://xnmc.statuspage.io" target="_blank" rel="noopener">Status</a>
+    <a href="https://discord.gg/UDGfVrTQs6" target="_blank" rel="noopener">Discord</a>
+    <a href="https://github.com/hunter-jsb/valheim-webmap" target="_blank" rel="noopener">Map mod</a>
+  </div>
+</nav>
+
+<div class="bar">
+  <button class="tbtn sidebtn" id="sideBtn" title="Plan details">&#9776;</button>
+  <div class="grp" id="tools"></div>
+  <span class="sep"></span>
+  <div class="grp" id="colors"></div>
+  <div class="grp" id="widths"></div>
+  <span class="sep"></span>
+  <div class="grp">
+    <button class="tbtn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+    <button class="tbtn" id="clearBtn" title="Remove every drawing">Clear</button>
+  </div>
+  <input id="labelIn" class="hide" placeholder="label text…" maxlength="60">
+  <div class="grp hide" id="stamps"></div>
+</div>
+
+<div class="app">
+  <aside class="side" id="side">
+    <div class="blk">
+      <h3>Plan</h3>
+      <input type="text" id="titleIn" placeholder="Untitled plan" maxlength="80">
+      <textarea id="notesIn" placeholder="Notes — meet at the karve, bring a cart…" maxlength="1200"></textarea>
+      <p class="note" id="count"></p>
+    </div>
+    <div class="blk">
+      <h3>Share</h3>
+      <div class="row">
+        <button class="tbtn" id="copyBtn">Copy link</button>
+        <button class="tbtn" id="pngBtn">Download PNG</button>
+      </div>
+      <input type="text" id="linkOut" readonly aria-label="Share link">
+      <p class="note" id="linkLen">The whole plan travels inside the link — no account, no server.</p>
+    </div>
+    <div class="blk">
+      <h3>Reference layers</h3>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="blk">
+      <h3>World</h3>
+      <p class="note" id="worldNote">loading…</p>
+      <div class="row" style="margin-top:.5rem">
+        <button class="tbtn" id="newBtn">New plan</button>
+      </div>
+    </div>
+    <div class="sidefoot">
+      <span id="buildstamp"></span> ·
+      <a href="index.html">live map</a> ·
+      <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a>
+    </div>
+  </aside>
+
+  <div class="stage pan" id="stage">
+    <canvas id="cv" aria-label="Valheim world map plan"></canvas>
+    <div class="banner" id="roBanner" hidden>
+      <b>Shared plan</b><span id="roWho">opened read-only, so your own plan is untouched.</span>
+      <button class="tbtn" id="copyPlanBtn">Make a copy</button>
+      <button class="tbtn" id="dismissBtn">Keep mine</button>
+    </div>
+    <div class="readout">
+      <span class="dist" id="distOut" hidden></span>
+      <span id="posOut">—</span>
+      <span class="scalebar"><i id="scaleBar"></i><em id="scaleTxt" style="font-style:normal"></em></span>
+    </div>
+    <div class="mapui">
+      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="zoomOut" title="Zoom out">&minus;</button>
+      <button id="zoomFit" title="Fit the explored world">&#8962;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- icons ----------
+// [path, fill, strokeless?] — flat silhouettes with a dark halo, one hue per family,
+// lifted from the live map's sprite so a plan reads like the map it sits on.
+const ICONS = {
+  "karve":[["M6.4 3.2h11.2v7.6h-4.2v4h-2.8v-4H6.4z","#ae5139"],
+           ["M1.8 12.6h20.4c-1 4.4-4.8 7-10.2 7S2.8 17 1.8 12.6z","#d2a271"]],
+  "raft":[["M10 4.6h8.4v6.8h-6v3.2h-2.4z","#ae5139"],
+          ["M2.6 13.8h5.8v5.6H2.6zM9.3 13.8h5.8v5.6H9.3zM16 13.8h5.8v5.6H16z","#d2a271"]],
+  "longship":[["M4.6 2.4h14.8v8.2h-6v4.4h-2.8v-4.4H4.6z","#ae5139"],
+              ["M1.6 8.6c1.8.8 2.6 2.2 2.6 4.2h15.6c0-2 .8-3.4 2.6-4.2-.8 2-.4 3.6 0 5.2-.8 4.4-5 6.8-10.4 6.8S2.4 18.2 1.6 13.8c.4-1.6.8-3.2 0-5.2z","#d2a271"]],
+  "cart":[["M16.6 7 21 3.6l1.4 2-4.4 3.4z","#c08a4a"],
+          ["M2.2 6.6h17.2l-2.4 7.6H4.6z","#c08a4a"],
+          ["M5.1 17a2.9 2.9 0 1 0 5.8 0a2.9 2.9 0 1 0-5.8 0","#e3bd85"],
+          ["M12.5 17a2.9 2.9 0 1 0 5.8 0a2.9 2.9 0 1 0-5.8 0","#e3bd85"]],
+  "portal":[["M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z","#6fd8e6"],
+            ["M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z","rgba(111,216,230,.38)",1]],
+  "grave":[["M12 3.2c-4.9 0-8.4 3.3-8.4 7.9 0 2.7 1.3 4.7 3 5.8v2.1c0 1 .8 1.8 1.8 1.8h7.2c1 0 1.8-.8 1.8-1.8v-2.1c1.7-1.1 3-3.1 3-5.8 0-4.6-3.5-7.9-8.4-7.9z","#d9c7a6"],
+           ["M5.9 11.2a2.5 2.8 0 1 0 5 0a2.5 2.8 0 1 0-5 0","#14130e",1],
+           ["M13.1 11.2a2.5 2.8 0 1 0 5 0a2.5 2.8 0 1 0-5 0","#14130e",1],
+           ["M12 14.2 13.6 17h-3.2z","#14130e",1]],
+  "pin-dot":[["M6.2 12a5.8 5.8 0 1 0 11.6 0a5.8 5.8 0 1 0-11.6 0","#e8b45f"]],
+  "pin-fire":[["M13 2.4c.8 4-1.6 5.2-3.4 7.2-2 2.2-3.2 4.4-3.2 6.6 0 3.6 2.6 6 5.6 6s5.6-2.4 5.6-6c0-4.4-2.8-8.6-4.6-13.8z","#ef8b3f"],
+              ["M12 11.6c2 2.2 3 3.6 3 5 0 1.8-1.3 3-3 3s-3-1.2-3-3c0-1.4 1-2.8 3-5z","#f8cf72",1]],
+  "pin-mine":[["M5.8 18.8 9 21 16.8 9.4 13.6 7.2z","#c2914b"],
+              ["M8.6 4.2Q20.4 1.2 21.6 13 15.2 8 8.6 4.2z","#e8b45f"]],
+  "pin-house":[["M12 3.2 22 12h-3.2v8.4H5.2V12H2z","#e8b45f"],
+               ["M10.2 20.4v-5.2h3.6v5.2z","#14130e",1]],
+  "pin-cave":[["M1.8 20.6 6.4 11.4 9.2 13.4 13 7.6 16.8 13.2 18.8 11.6 22.2 20.6z","#e8b45f"],
+              ["M8.4 20.6c0-3.8 1.6-6.2 3.6-6.2s3.6 2.4 3.6 6.2z","#14130e",1]],
+  "danger":[["M12 2.6 23 20.8H1z","#e05b4a"],
+            ["M10.9 8.2h2.2l-.45 6.4h-1.3z","#14130e",1],
+            ["M10.5 17.4a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0","#14130e",1]],
+  // the tools, in the same hand as the markers
+  "pen":[["M3.4 20.6l1.1-4.2L15.9 5l3.1 3.1L7.6 19.5z","#e7e2d4"],["M16.9 4 19 1.9l3.1 3.1-2.1 2.1z","#c9a15a"]],
+  "line":[["M3.6 19.2 19.2 3.6l1.6 1.6L5.2 20.8z","#e7e2d4"]],
+  "arrow":[["M3 19.6 17 5.6l1.6 1.6L4.6 21.2z","#e7e2d4"],["M21.4 2.6 20 10.4l-6.4-6.4z","#c9a15a"]],
+  "rect":[["M2.6 5h18.8v14H2.6zm2.2 2.2v9.6h14.4V7.2z","#e7e2d4"]],
+  "circle":[["M12 2.6A9.4 9.4 0 1 0 12 21.4 9.4 9.4 0 1 0 12 2.6m0 2.2a7.2 7.2 0 1 1 0 14.4 7.2 7.2 0 1 1 0-14.4","#e7e2d4"]],
+  "text":[["M3.6 3.4h16.8v4h-2.2V5.6h-4.1v12.8h2.4v2.2H7.5v-2.2h2.4V5.6H5.8v1.8H3.6z","#e7e2d4"]],
+  "stamp":[["M8.2 2.6h7.6v5.2l2 4.4H6.2l2-4.4z","#c9a15a"],["M3.6 13.6h16.8v3H3.6zm0 4.6h16.8v3H3.6z","#e7e2d4"]],
+  "ruler":[["M2 8.2 8.2 2 22 15.8 15.8 22z","#e7e2d4"],
+           ["M6.4 7.6 8.9 10.1M9.4 4.6l2.5 2.5M11.5 12.7 14 15.2M14.5 9.7l2.5 2.5","#14130e",1]],
+  "erase":[["M9.6 21.4 2.6 14.4 13.4 3.6l7 7z","#e05b4a"],["M7.6 11.4 14.6 18.4l-2.9 3H9.6l-6-6z","#e7e2d4"]],
+  "hand":[["M6 11V5.6a1.7 1.7 0 0 1 3.4 0V4a1.7 1.7 0 0 1 3.4 0v1a1.7 1.7 0 0 1 3.4 0v1.6a1.7 1.7 0 0 1 3.4 0V14c0 4.4-3 7.4-7.2 7.4-3 0-5-1.4-6.6-4L3 13.4c-.7-1.2 1-2.6 2-1.5z","#e7e2d4"]],
+};
+const ICON_PATHS = {};
+for(const k in ICONS) ICON_PATHS[k] = ICONS[k].map(p => [new Path2D(p[0]), p[1], p[2]]);
+document.getElementById("icons").innerHTML = Object.keys(ICONS).map(k =>
+  `<symbol id="ic-${k}" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">`
+  + ICONS[k].map(p => `<path d="${p[0]}" fill="${p[1]}"${p[2] ? ' stroke="none"' : ""}/>`).join("")
+  + `</symbol>`).join("");
+const svgIcon = (k, s) => `<svg style="width:${s||18}px;height:${s||18}px"><use href="#ic-${k}"></use></svg>`;
+
+// ---------- geometry ----------
+// The map is a square texture of the world: 2048 px at 12 m a pixel. Drawings are
+// stored in world metres, projected to texture px, then to the screen, so a route
+// drawn at world zoom sits on the same rock at build zoom.
+const API = "https://valheim-proxy.hunterjsb.workers.dev";
+const BUILD = "2026-09-13p";
+let GEOM = {pixel:12, size:2048, world:"Mothership"};
+const toPx = (x,z) => [x/GEOM.pixel + GEOM.size/2, GEOM.size/2 - z/GEOM.pixel];
+const toWorld = (px,py) => [(px - GEOM.size/2)*GEOM.pixel, (GEOM.size/2 - py)*GEOM.pixel];
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const MAX_ZOOM = 120;
+let scale = 1, tx = 0, ty = 0, fit = 1;
+
+const stage = document.getElementById("stage");
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const view = () => ({scale, tx, ty});
+const w2s = (x,z) => { const p = toPx(x,z); return [tx + p[0]*scale, ty + p[1]*scale]; };
+const s2w = (sx,sy) => toWorld((sx - tx)/scale, (sy - ty)/scale);
+
+// ---------- the document ----------
+// One JSON object is the whole plan: the same bytes go to localStorage, into the
+// share link, and one day to a server, so nothing here may depend on the browser.
+const PALETTE = ["#ffd166", "#4dd2ff", "#ff6b6b", "#7ee081", "#ffffff"];
+const WIDTHS = [2, 5];
+const DEFAULT_LAYERS = {forest:true, builds:true, portals:true, graves:false, vehicles:false, pins:true, players:true};
+const newDoc = () => ({v:1, title:"", notes:"", view:{x:0, z:0, zoom:1},
+                       layers:Object.assign({}, DEFAULT_LAYERS), items:[]});
+let doc = newDoc();
+let RO = false;                 // a shared link opens read-only: their plan is not yours to overwrite
+const undoStack = [];
+
+const r1 = v => Math.round(v*10)/10;
+function snapshot(){
+  const c = s2w(cv.clientWidth/2, cv.clientHeight/2);
+  doc.view = {x:r1(c[0]), z:r1(c[1]), zoom:Math.round(scale*1000)/1000};
+  return doc;
+}
+function pushUndo(){
+  undoStack.push(JSON.stringify(doc.items));
+  if(undoStack.length > 60) undoStack.shift();
+}
+
+// ---------- reference data ----------
+const DATA = {portals:[], graves:[], vehicles:[], pins:[], players:[]};
+const RASTER = {};
+for(const [k, url] of [["base","/base-6f3a9c2e?v=4k"], ["fog","/fog"], ["forest","/forest"], ["struct","/structures"]]){
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.addEventListener("load", () => { draw(); if(k === "fog") fogReady(); });
+  img.src = API + url;
+  RASTER[k] = img;
+}
+
+// ---------- render ----------
+// One pass paints everything, and the PNG export runs the same pass at 2x, so what
+// gets shared is exactly what is on screen.
+function render(g, W, H, v, o){
+  o = o || {};
+  const pix = o.pix || 1;
+  g.setTransform(pix, 0, 0, pix, 0, 0);
+  g.globalCompositeOperation = "source-over";
+  g.fillStyle = "#0a0c0a"; g.fillRect(0, 0, W, H);
+  const sx = -v.tx/v.scale, sy = -v.ty/v.scale, sw = W/v.scale, sh = H/v.scale;
+  const blit = (img, smooth, op) => {
+    if(!img || !img.complete || !img.naturalWidth) return;
+    const k = img.naturalWidth/GEOM.size;          // source px per texture px
+    g.imageSmoothingEnabled = smooth;
+    g.globalCompositeOperation = op;
+    try{ g.drawImage(img, sx*k, sy*k, sw*k, sh*k, 0, 0, W, H); }catch(e){}
+  };
+  blit(RASTER.base, v.scale < 3, "source-over");
+  // multiplied twice, which squares the effect: dense woods go markedly darker
+  // while a thinned patch barely moves, so the difference reads at a glance
+  if(doc.layers.forest){ blit(RASTER.forest, true, "multiply"); blit(RASTER.forest, true, "multiply"); }
+  if(doc.layers.builds) blit(RASTER.struct, true, "source-over");
+  blit(RASTER.fog, true, "multiply");             // unexplored ground stays dark
+  g.globalCompositeOperation = "source-over";
+  g.imageSmoothingEnabled = true;
+
+  drawRefs(g, v, W, H);
+  for(const it of doc.items) drawItem(g, v, it);
+  if(draft) drawItem(g, v, draft);
+  if(measure && measure.b) drawMeasure(g, v);
+}
+
+function project(v, x, z){ const p = toPx(x, z); return [v.tx + p[0]*v.scale, v.ty + p[1]*v.scale]; }
+
+function drawIcon(g, key, x, y, size){
+  const paths = ICON_PATHS[key]; if(!paths) return;
+  g.save();
+  g.translate(x, y); g.scale(size/24, size/24); g.translate(-12, -12);
+  g.strokeStyle = "#0b0e0b"; g.lineWidth = 2.6; g.lineJoin = "round"; g.lineCap = "round";
+  for(const [p, fill, noStroke] of paths){
+    if(!noStroke) g.stroke(p);
+    g.fillStyle = fill; g.fill(p);
+  }
+  g.restore();
+}
+function haloText(g, txt, x, y, color, size, weight){
+  g.font = `${weight||600} ${size}px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif`;
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineJoin = "round"; g.lineWidth = Math.max(3, size*0.34);
+  g.strokeStyle = "rgba(8,10,8,.88)"; g.strokeText(txt, x, y);
+  g.fillStyle = color; g.fillText(txt, x, y);
+}
+
+function drawRefs(g, v, W, H){
+  const on = (x, y) => x > -120 && y > -120 && x < W + 120 && y < H + 120;
+  if(doc.layers.portals){
+    g.save();
+    g.strokeStyle = "rgba(111,216,230,.55)"; g.lineWidth = 2; g.setLineDash([8, 6]);
+    const by = new Map(DATA.portals.map(p => [p.id, p])), seen = new Set();
+    for(const p of DATA.portals){
+      const q = p.to && by.get(p.to); if(!q) continue;
+      const key = p.id < p.to ? p.id + "|" + p.to : p.to + "|" + p.id;
+      if(seen.has(key)) continue; seen.add(key);
+      const a = project(v, p.x, p.z), b = project(v, q.x, q.z);
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    }
+    g.restore();
+    for(const p of DATA.portals){
+      const [x, y] = project(v, p.x, p.z); if(!on(x, y)) continue;
+      drawIcon(g, "portal", x, y, 16);
+      if(p.name) haloText(g, p.name, x, y + 15, "#9fe8f2", 11);
+    }
+  }
+  if(doc.layers.graves) for(const m of DATA.graves){
+    const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
+    drawIcon(g, "grave", x, y, 16);
+    if(m.name) haloText(g, m.name, x, y + 15, "#d9c7a6", 11);
+  }
+  if(doc.layers.vehicles) for(const m of DATA.vehicles){
+    const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
+    drawIcon(g, vehicleIcon(m), x, y, m.kind === "cart" ? 16 : 18);
+  }
+  if(doc.layers.pins) for(const m of DATA.pins){
+    const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
+    drawIcon(g, PIN_ICON[m.type] || "pin-dot", x, y, 17);
+    if(m.text) haloText(g, m.text, x, y + 15, "#e8b45f", 11);
+  }
+  if(doc.layers.players) for(const m of DATA.players){
+    const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
+    g.beginPath(); g.arc(x, y, 5.5, 0, 7);
+    g.fillStyle = "#6faf68"; g.fill();
+    g.lineWidth = 2; g.strokeStyle = "#0a0c0a"; g.stroke();
+    haloText(g, m.name, x, y + 14, "#ffffff", 11);
+  }
+}
+const PIN_ICON = {dot:"pin-dot", fire:"pin-fire", mine:"pin-mine", house:"pin-house", cave:"pin-cave"};
+const VEH_ICON = {raft:"raft", karve:"karve", vikingship:"longship", cart:"cart"};
+const vehicleIcon = m => VEH_ICON[(m.name || "").toLowerCase()] || (m.kind === "cart" ? "cart" : "karve");
+
+// ---------- items ----------
+// t: pen | line | arrow | rect | circle | text | stamp
+// c: palette index, w: width index, p: flat world coordinates, s: label, k: stamp key
+function drawItem(g, v, it){
+  const col = PALETTE[it.c] || PALETTE[0], lw = WIDTHS[it.w] || WIDTHS[0];
+  g.save();
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = lw; g.lineCap = "round"; g.lineJoin = "round";
+  const pt = i => project(v, it.p[i*2], it.p[i*2+1]);
+  if(it.t === "pen" || it.t === "line" || it.t === "arrow"){
+    g.beginPath();
+    const n = it.p.length/2;
+    for(let i = 0; i < n; i++){ const q = pt(i); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }
+    g.stroke();
+    if(it.t === "arrow" && n >= 2){
+      const a = pt(n-2), b = pt(n-1), ang = Math.atan2(b[1]-a[1], b[0]-a[0]), h = 7 + lw*2.2;
+      g.beginPath();
+      g.moveTo(b[0], b[1]);
+      g.lineTo(b[0] - h*Math.cos(ang - 0.42), b[1] - h*Math.sin(ang - 0.42));
+      g.lineTo(b[0] - h*Math.cos(ang + 0.42), b[1] - h*Math.sin(ang + 0.42));
+      g.closePath(); g.fill();
+    }
+  } else if(it.t === "rect"){
+    const a = pt(0), b = pt(1);
+    g.beginPath(); g.rect(Math.min(a[0],b[0]), Math.min(a[1],b[1]), Math.abs(b[0]-a[0]), Math.abs(b[1]-a[1]));
+    g.globalAlpha = 0.13; g.fill(); g.globalAlpha = 1; g.stroke();
+  } else if(it.t === "circle"){
+    const a = pt(0), b = pt(1), r = Math.hypot(b[0]-a[0], b[1]-a[1]);
+    g.beginPath(); g.arc(a[0], a[1], r, 0, 7);
+    g.globalAlpha = 0.13; g.fill(); g.globalAlpha = 1; g.stroke();
+  } else if(it.t === "text"){
+    const a = pt(0);
+    haloText(g, it.s || "", a[0], a[1], col, it.w ? 20 : 14, 700);
+  } else if(it.t === "stamp"){
+    const a = pt(0), size = it.w ? 34 : 24;
+    drawIcon(g, it.k || "pin-dot", a[0], a[1], size);
+    if(it.s) haloText(g, it.s, a[0], a[1] + size*0.72, col, it.w ? 15 : 12, 700);
+  }
+  g.restore();
+}
+
+// Screen-space hit test: what the eraser is over, topmost first.
+function hitItem(it, sx, sy){
+  const v = view(), tol = 8 + (WIDTHS[it.w] || 2);
+  const pt = i => project(v, it.p[i*2], it.p[i*2+1]);
+  const near = (a, b) => {
+    const dx = b[0]-a[0], dy = b[1]-a[1], L = dx*dx + dy*dy;
+    const t = L ? clamp(((sx-a[0])*dx + (sy-a[1])*dy)/L, 0, 1) : 0;
+    return Math.hypot(sx - (a[0]+t*dx), sy - (a[1]+t*dy)) <= tol;
+  };
+  if(it.t === "pen" || it.t === "line" || it.t === "arrow"){
+    const n = it.p.length/2;
+    if(n === 1) return Math.hypot(sx-pt(0)[0], sy-pt(0)[1]) <= tol;
+    for(let i = 1; i < n; i++) if(near(pt(i-1), pt(i))) return true;
+    return false;
+  }
+  if(it.t === "rect"){
+    const a = pt(0), b = pt(1);
+    const x0 = Math.min(a[0],b[0]), x1 = Math.max(a[0],b[0]), y0 = Math.min(a[1],b[1]), y1 = Math.max(a[1],b[1]);
+    return sx >= x0-tol && sx <= x1+tol && sy >= y0-tol && sy <= y1+tol;
+  }
+  if(it.t === "circle"){
+    const a = pt(0), b = pt(1), r = Math.hypot(b[0]-a[0], b[1]-a[1]);
+    return Math.hypot(sx-a[0], sy-a[1]) <= r + tol;
+  }
+  const a = pt(0), s = it.t === "stamp" ? (it.w ? 20 : 15) : 22;
+  return Math.abs(sx-a[0]) <= s + 8 && Math.abs(sy-a[1]) <= s + 8;
+}
+
+// ---------- measuring ----------
+// Speeds a player can feel: a karve at ~7 m/s, a longship at ~9, a sprint at ~7
+// and a steady jog at ~5. Good enough to answer "before nightfall?".
+const SPEEDS = [["karve", 7], ["longship", 9], ["run", 7], ["jog", 5]];
+let measure = null;
+function hms(sec){
+  sec = Math.round(sec);
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if(h) return h + "h " + String(m).padStart(2, "0") + "m";
+  return m ? m + "m " + String(s).padStart(2, "0") + "s" : s + "s";
+}
+function drawMeasure(g, v){
+  const a = project(v, measure.a[0], measure.a[1]), b = project(v, measure.b[0], measure.b[1]);
+  g.save();
+  g.strokeStyle = "#c9a15a"; g.lineWidth = 2; g.setLineDash([7, 5]);
+  g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+  g.setLineDash([]);
+  for(const p of [a, b]){ g.beginPath(); g.arc(p[0], p[1], 4, 0, 7); g.fillStyle = "#c9a15a"; g.fill(); }
+  const d = Math.hypot(measure.b[0]-measure.a[0], measure.b[1]-measure.a[1]);
+  haloText(g, Math.round(d) + " m", (a[0]+b[0])/2, (a[1]+b[1])/2 - 12, "#ffd166", 13, 700);
+  g.restore();
+}
+function measureOut(){
+  const out = document.getElementById("distOut");
+  if(!measure || !measure.b){ out.hidden = true; return; }
+  const d = Math.hypot(measure.b[0]-measure.a[0], measure.b[1]-measure.a[1]);
+  out.hidden = false;
+  out.textContent = Math.round(d) + " m · " + SPEEDS.map(([n, v]) => n + " " + hms(d/v)).join(" · ");
+}
+
+// ---------- view ----------
+function sizeCanvas(){
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const W = stage.clientWidth, H = stage.clientHeight;
+  if(cv.width !== Math.round(W*dpr) || cv.height !== Math.round(H*dpr)){
+    cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  }
+  return dpr;
+}
+let pending = false, lastW = 0, lastH = 0;
+function draw(){
+  if(pending) return;
+  pending = true;
+  requestAnimationFrame(() => {
+    pending = false;
+    const dpr = sizeCanvas();
+    lastW = stage.clientWidth; lastH = stage.clientHeight;
+    render(ctx, lastW, lastH, view(), {pix:dpr});
+    scaleBar();
+  });
+}
+function computeFit(){ fit = Math.min(stage.clientWidth/GEOM.size, stage.clientHeight/GEOM.size)*0.98; }
+function zoomAt(cx, cy, factor){
+  const ns = clamp(scale*factor, fit*0.5, MAX_ZOOM);
+  tx = cx - (cx - tx)*(ns/scale);
+  ty = cy - (cy - ty)*(ns/scale);
+  scale = ns; draw(); saveSoon();
+}
+function centreOn(x, z, zoom){
+  computeFit();
+  scale = clamp(zoom || scale, fit*0.5, MAX_ZOOM);
+  const p = toPx(x, z);
+  tx = stage.clientWidth/2 - p[0]*scale;
+  ty = stage.clientHeight/2 - p[1]*scale;
+  draw();
+}
+function fitWorld(){ centreOn(0, 0, Math.min(stage.clientWidth, stage.clientHeight)/GEOM.size*0.98); }
+// A fresh world is almost all fog, so "fit" means fit what anyone has actually walked.
+function fitExplored(){
+  const N = 256, c = document.createElement("canvas");
+  c.width = c.height = N;
+  const g = c.getContext("2d", {willReadFrequently:true});
+  let d;
+  try{ g.drawImage(RASTER.fog, 0, 0, N, N); d = g.getImageData(0, 0, N, N).data; }
+  catch(e){ return fitWorld(); }
+  let x0 = N, y0 = N, x1 = -1, y1 = -1;
+  for(let y = 0; y < N; y++) for(let x = 0; x < N; x++) if(d[(y*N+x)*4] > 40){
+    if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y;
+  }
+  if(x1 < 0) return fitWorld();
+  computeFit();
+  const k = GEOM.size/N, bw = (x1-x0+1)*k, bh = (y1-y0+1)*k, pad = 1.15;
+  scale = clamp(Math.min(stage.clientWidth/(bw*pad), stage.clientHeight/(bh*pad)), fit*0.5, MAX_ZOOM);
+  tx = stage.clientWidth/2 - (x0*k + bw/2)*scale;
+  ty = stage.clientHeight/2 - (y0*k + bh/2)*scale;
+  draw(); saveSoon();
+}
+let gotFog = false;
+function fogReady(){ if(!gotFog){ gotFog = true; if(!viewFromDoc) fitExplored(); } }
+function scaleBar(){
+  const mpp = GEOM.pixel/scale;                 // metres per screen pixel
+  let m = 10;
+  while(m/mpp < 60) m *= m.toString()[0] === "1" ? 2.5 : 2;
+  while(m/mpp > 150) m /= m.toString()[0] === "2" ? 2 : 2.5;
+  document.getElementById("scaleBar").style.width = Math.round(m/mpp) + "px";
+  document.getElementById("scaleTxt").textContent = m >= 1000 ? (m/1000) + " km" : Math.round(m) + " m";
+  if(!hovered){
+    const c = s2w(stage.clientWidth/2, stage.clientHeight/2);
+    document.getElementById("posOut").textContent = Math.round(c[0]) + ", " + Math.round(c[1]);
+  }
+}
+let hovered = false;
+
+// ---------- tools ----------
+const TOOLS = [
+  {k:"pan",    icon:"hand",   name:"Pan"},
+  {k:"pen",    icon:"pen",    name:"Pen"},
+  {k:"line",   icon:"line",   name:"Line"},
+  {k:"arrow",  icon:"arrow",  name:"Arrow"},
+  {k:"rect",   icon:"rect",   name:"Box"},
+  {k:"circle", icon:"circle", name:"Circle"},
+  {k:"text",   icon:"text",   name:"Label"},
+  {k:"stamp",  icon:"stamp",  name:"Stamp"},
+  {k:"measure",icon:"ruler",  name:"Distance"},
+  {k:"erase",  icon:"erase",  name:"Erase"},
+];
+const STAMPS = [
+  {k:"pin-mine",  name:"Ore"},
+  {k:"pin-fire",  name:"Camp"},
+  {k:"pin-house", name:"Base"},
+  {k:"portal",    name:"Portal"},
+  {k:"karve",     name:"Boat"},
+  {k:"danger",    name:"Danger"},
+  {k:"pin-cave",  name:"Cave"},
+];
+let tool = "pan", colour = 0, width = 0, stampKey = "pin-mine";
+
+document.getElementById("tools").innerHTML = TOOLS.map(t =>
+  `<button class="tbtn" data-tool="${t.k}" title="${t.name}">${svgIcon(t.icon)}</button>`).join("");
+document.getElementById("stamps").innerHTML = STAMPS.map(s =>
+  `<button class="tbtn" data-stamp="${s.k}" title="${s.name}">${svgIcon(s.k)}</button>`).join("");
+document.getElementById("colors").innerHTML = PALETTE.map((c, i) =>
+  `<span class="sw" data-col="${i}" style="background:${c}" title="colour ${i+1}"></span>`).join("");
+document.getElementById("widths").innerHTML = WIDTHS.map((w, i) =>
+  `<button class="wbtn" data-wid="${i}" title="${i ? "thick" : "thin"}"><i style="width:18px;height:${w}px"></i></button>`).join("");
+
+function setTool(k){
+  tool = k;
+  document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("on", b.dataset.tool === k));
+  document.getElementById("labelIn").classList.toggle("hide", k !== "text" && k !== "stamp");
+  document.getElementById("stamps").classList.toggle("hide", k !== "stamp");
+  stage.classList.toggle("pan", k === "pan");
+  stage.classList.toggle("erase", k === "erase");
+  if(k !== "measure"){ measure = null; measureOut(); draw(); }
+}
+function setColour(i){
+  colour = i;
+  document.querySelectorAll("[data-col]").forEach(b => b.classList.toggle("on", +b.dataset.col === i));
+}
+function setWidth(i){
+  width = i;
+  document.querySelectorAll("[data-wid]").forEach(b => b.classList.toggle("on", +b.dataset.wid === i));
+}
+document.querySelector(".bar").addEventListener("click", e => {
+  const t = e.target.closest("[data-tool]"), c = e.target.closest("[data-col]"),
+        w = e.target.closest("[data-wid]"), s = e.target.closest("[data-stamp]");
+  if(t) setTool(t.dataset.tool);
+  if(c) setColour(+c.dataset.col);
+  if(w) setWidth(+w.dataset.wid);
+  if(s){ stampKey = s.dataset.stamp; setTool("stamp"); markStamp(); }
+});
+function markStamp(){
+  document.querySelectorAll("[data-stamp]").forEach(b => b.classList.toggle("on", b.dataset.stamp === stampKey));
+}
+setTool("pan"); setColour(0); setWidth(0); markStamp();
+
+// ---------- pointer ----------
+const pts = new Map();
+let last = null, pinch = null, draft = null, panning = false;
+function rel(e){ const r = stage.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+
+stage.addEventListener("pointerdown", e => {
+  if(e.target.closest(".mapui") || e.target.closest(".banner")) return;
+  try{ stage.setPointerCapture(e.pointerId); }catch(err){}
+  pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pts.size === 2){ pinch = pinchState(); draft = null; return; }
+  if(pts.size > 2) return;
+  const [sx, sy] = rel(e);
+  const drawTool = !RO && tool !== "pan" && tool !== "measure" && tool !== "erase";
+  if(tool === "pan" || e.button === 1 || spaceDown || RO && tool !== "measure"){
+    panning = true; last = {x:e.clientX, y:e.clientY}; stage.classList.add("dragging"); return;
+  }
+  if(tool === "measure"){ measure = {a:s2w(sx, sy), b:null, live:true}; return; }
+  if(tool === "erase"){ eraseAt(sx, sy); return; }
+  if(!drawTool) return;
+  const w = s2w(sx, sy);
+  if(tool === "text"){
+    const s = (document.getElementById("labelIn").value || "").trim();
+    if(!s){ flashLabel(); return; }
+    commit({t:"text", c:colour, w:width, p:[r1(w[0]), r1(w[1])], s});
+    return;
+  }
+  if(tool === "stamp"){
+    const s = (document.getElementById("labelIn").value || "").trim();
+    commit(Object.assign({t:"stamp", c:colour, w:width, p:[r1(w[0]), r1(w[1])], k:stampKey}, s ? {s} : {}));
+    return;
+  }
+  draft = {t:tool, c:colour, w:width, p:[Math.round(w[0]), Math.round(w[1])]};
+  if(tool !== "pen") draft.p.push(Math.round(w[0]), Math.round(w[1]));
+});
+
+stage.addEventListener("pointermove", e => {
+  const [sx, sy] = rel(e);
+  const w = s2w(sx, sy);
+  hovered = true;
+  document.getElementById("posOut").textContent = Math.round(w[0]) + ", " + Math.round(w[1]);
+  if(!pts.has(e.pointerId)) return;
+  pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pts.size === 2 && pinch){
+    const p = pinchState(), r = stage.getBoundingClientRect();
+    if(pinch.dist > 0) zoomAt(p.cx - r.left, p.cy - r.top, p.dist/pinch.dist);
+    pinch = p; return;
+  }
+  if(panning && last){
+    tx += e.clientX - last.x; ty += e.clientY - last.y;
+    last = {x:e.clientX, y:e.clientY}; draw(); saveSoon(); return;
+  }
+  if(measure && measure.live){ measure.b = w; measureOut(); draw(); return; }
+  if(!draft) return;
+  if(draft.t === "pen"){
+    const n = draft.p.length;
+    const prev = project(view(), draft.p[n-2], draft.p[n-1]);
+    if(Math.hypot(sx - prev[0], sy - prev[1]) < 2.5) return;
+    draft.p.push(Math.round(w[0]), Math.round(w[1]));
+  } else {
+    draft.p[2] = r1(w[0]); draft.p[3] = r1(w[1]);
+  }
+  draw();
+});
+
+function endPtr(e){
+  pts.delete(e.pointerId);
+  if(pts.size < 2) pinch = null;
+  if(pts.size === 0){
+    last = null; panning = false; stage.classList.remove("dragging");
+    if(measure && measure.live){ measure.live = false; if(!measure.b) measure = null; measureOut(); draw(); }
+    if(draft){
+      const d = draft; draft = null;
+      let keep;
+      if(d.t === "pen") keep = d.p.length >= 4;
+      else{
+        const a = project(view(), d.p[0], d.p[1]), b = project(view(), d.p[2], d.p[3]);
+        keep = Math.hypot(b[0]-a[0], b[1]-a[1]) > 4;
+      }
+      if(keep) commit(d); else draw();
+    }
+  } else {
+    const p = [...pts.values()][0]; last = {x:p.x, y:p.y};
+  }
+}
+stage.addEventListener("pointerup", endPtr);
+stage.addEventListener("pointercancel", endPtr);
+function pinchState(){
+  const [a, b] = [...pts.values()];
+  return {dist:Math.hypot(a.x-b.x, a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2};
+}
+stage.addEventListener("wheel", e => {
+  e.preventDefault();
+  const [sx, sy] = rel(e);
+  zoomAt(sx, sy, Math.exp(-e.deltaY*0.0015));
+}, {passive:false});
+
+function commit(it){
+  pushUndo();
+  doc.items.push(it);
+  save(); draw(); renderCount();
+}
+function eraseAt(sx, sy){
+  for(let i = doc.items.length - 1; i >= 0; i--){
+    if(hitItem(doc.items[i], sx, sy)){
+      pushUndo(); doc.items.splice(i, 1); save(); draw(); renderCount(); return;
+    }
+  }
+}
+function flashLabel(){
+  const el = document.getElementById("labelIn");
+  el.focus(); el.style.borderColor = "var(--gold)";
+  setTimeout(() => el.style.borderColor = "", 700);
+}
+
+let spaceDown = false;
+addEventListener("keydown", e => {
+  if(e.target.matches("input,textarea")) return;
+  if(e.code === "Space"){ spaceDown = true; e.preventDefault(); }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z"){ e.preventDefault(); undo(); }
+  if(e.key === "Escape"){ draft = null; measure = null; measureOut(); draw(); }
+});
+addEventListener("keyup", e => { if(e.code === "Space") spaceDown = false; });
+
+function undo(){
+  if(RO || !undoStack.length) return;
+  doc.items = JSON.parse(undoStack.pop());
+  save(); draw(); renderCount();
+}
+document.getElementById("undoBtn").onclick = undo;
+document.getElementById("clearBtn").onclick = () => {
+  if(RO || !doc.items.length) return;
+  pushUndo(); doc.items = []; save(); draw(); renderCount();
+};
+document.getElementById("newBtn").onclick = () => {
+  if(doc.items.length && !confirm("Clear the title, notes and every drawing?")) return;
+  doc = newDoc(); RO = false; undoStack.length = 0;
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("roBanner").hidden = true;
+  syncFields(); save(); draw(); renderCount(); setRO(false);
+};
+document.getElementById("zoomIn").onclick = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1.35);
+document.getElementById("zoomOut").onclick = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1/1.35);
+document.getElementById("zoomFit").onclick = fitExplored;
+document.getElementById("sideBtn").onclick = () => {
+  const s = document.getElementById("side");
+  s.hidden = !s.hidden;
+  setTimeout(keepCentre, 0);
+};
+function keepCentre(){
+  if(!lastW || !lastH) return draw();
+  const c = s2w(lastW/2, lastH/2);
+  computeFit();
+  centreOn(c[0], c[1], clamp(scale, fit*0.5, MAX_ZOOM));
+}
+addEventListener("resize", keepCentre);
+
+// ---------- title, notes, layers ----------
+const titleIn = document.getElementById("titleIn"), notesIn = document.getElementById("notesIn");
+titleIn.addEventListener("input", () => { doc.title = titleIn.value; saveSoon(); });
+notesIn.addEventListener("input", () => { doc.notes = notesIn.value; saveSoon(); });
+function syncFields(){
+  titleIn.value = doc.title || ""; notesIn.value = doc.notes || "";
+  renderLegend(); renderCount();
+}
+function renderCount(){
+  const n = doc.items.length;
+  document.getElementById("count").textContent = n ? n + (n === 1 ? " drawing" : " drawings") + " on the map" : "Pick a tool and draw on the map.";
+}
+const LAYERS = [
+  {k:"forest",   label:"forest → cleared", grad:true},
+  {k:"builds",   label:"builds", sw:"#966c42"},
+  {k:"portals",  label:"portals", icon:"portal"},
+  {k:"graves",   label:"graves", icon:"grave"},
+  {k:"vehicles", label:"boats & carts", icon:"karve"},
+  {k:"pins",     label:"pins", icon:"pin-dot"},
+  {k:"players",  label:"players online", sw:"#6faf68"},
+];
+function renderLegend(){
+  document.getElementById("legend").innerHTML = LAYERS.map(l => {
+    const chip = l.icon ? svgIcon(l.icon) : `<b class="${l.grad ? "grad" : ""}" style="${l.sw ? "background:" + l.sw : ""}"></b>`;
+    const off = doc.layers[l.k] ? "" : " off";
+    return `<span class="chip${off}" data-layer="${l.k}">${chip}</span><span class="${off.trim()}" data-layer="${l.k}">${l.label}</span>`;
+  }).join("");
+}
+document.getElementById("legend").addEventListener("click", e => {
+  const el = e.target.closest("[data-layer]"); if(!el) return;
+  doc.layers[el.dataset.layer] = !doc.layers[el.dataset.layer];
+  renderLegend(); save(); draw();
+});
+
+// ---------- storage ----------
+const KEY = "xnv.plan";
+let saveTimer = null;
+function save(){
+  if(RO) return;
+  try{ localStorage.setItem(KEY, JSON.stringify(snapshot())); }catch(e){}
+  linkOut.value = ""; document.getElementById("linkLen").textContent = "Copy link puts the whole plan in the URL.";
+}
+function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
+function storedPlan(){
+  try{ return JSON.parse(localStorage.getItem(KEY) || "null"); }catch(e){ return null; }
+}
+
+// ---------- share link ----------
+// The document deflates to a fraction of its JSON, so a twenty-item plan fits in a
+// link people can paste into Discord. No server is involved, by design: the same
+// bytes will POST to one unchanged when there is a server to POST them to.
+const b64url = bytes => {
+  let s = "";
+  for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+const unb64url = s => {
+  const b = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
+  const out = new Uint8Array(b.length);
+  for(let i = 0; i < b.length; i++) out[i] = b.charCodeAt(i);
+  return out;
+};
+async function encodeDoc(d){
+  const json = JSON.stringify(d);
+  if(typeof CompressionStream !== "function") return "j=" + b64url(new TextEncoder().encode(json));
+  const cs = new CompressionStream("deflate-raw");
+  const buf = await new Response(new Blob([new TextEncoder().encode(json)]).stream().pipeThrough(cs)).arrayBuffer();
+  return "p=" + b64url(new Uint8Array(buf));
+}
+async function decodeDoc(hash){
+  const m = /^#?(p|j)=([A-Za-z0-9\-_]+)$/.exec(hash || "");
+  if(!m) return null;
+  const bytes = unb64url(m[2]);
+  let json;
+  if(m[1] === "j") json = new TextDecoder().decode(bytes);
+  else{
+    const ds = new DecompressionStream("deflate-raw");
+    const buf = await new Response(new Blob([bytes]).stream().pipeThrough(ds)).arrayBuffer();
+    json = new TextDecoder().decode(buf);
+  }
+  const d = JSON.parse(json);
+  if(!d || d.v !== 1 || !Array.isArray(d.items)) throw new Error("not a plan");
+  d.layers = Object.assign({}, DEFAULT_LAYERS, d.layers || {});
+  return d;
+}
+const linkOut = document.getElementById("linkOut");
+async function shareLink(){
+  const frag = await encodeDoc(snapshot());
+  return location.origin + location.pathname + "#" + frag;
+}
+document.getElementById("copyBtn").onclick = async () => {
+  const url = await shareLink();
+  linkOut.value = url;
+  document.getElementById("linkLen").innerHTML = `<b>${url.length}</b> characters — paste it in Discord. Anyone opening it sees this plan read-only.`;
+  let ok = false;
+  try{ await navigator.clipboard.writeText(url); ok = true; }catch(e){}
+  if(!ok){ linkOut.focus(); linkOut.select(); }
+  const b = document.getElementById("copyBtn");
+  b.textContent = ok ? "Copied" : "Select & copy";
+  setTimeout(() => b.textContent = "Copy link", 1600);
+};
+
+// ---------- PNG export ----------
+// The same render at 2x with the title burnt in, so a screenshot dropped in chat
+// still says what it is and how big the ground is.
+async function exportPNG(){
+  const W = stage.clientWidth, H = stage.clientHeight, pix = 2;
+  const c = document.createElement("canvas");
+  c.width = W*pix; c.height = H*pix;
+  const g = c.getContext("2d");
+  render(g, W, H, view(), {pix});
+  g.setTransform(pix, 0, 0, pix, 0, 0);
+  const title = (doc.title || "Untitled plan").slice(0, 60);
+  g.font = `700 20px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif`;
+  const tw = g.measureText(title).width;
+  g.fillStyle = "rgba(10,12,10,.78)";
+  g.beginPath();
+  (g.roundRect ? g.roundRect(10, 10, tw + 24, 38, 6) : g.rect(10, 10, tw + 24, 38));
+  g.fill();
+  g.fillStyle = "#c9a15a"; g.textAlign = "left"; g.textBaseline = "middle";
+  g.fillText(title, 22, 30);
+  const mpp = GEOM.pixel/scale;
+  const foot = `${GEOM.world} · ${Math.round(W*mpp)} m across · xandaris valheim`;
+  g.font = `500 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif`;
+  g.fillStyle = "rgba(231,226,212,.7)"; g.textAlign = "right"; g.textBaseline = "bottom";
+  g.fillText(foot, W - 12, H - 10);
+  const blob = await new Promise(r => c.toBlob(r, "image/png"));
+  if(!blob) throw new Error("toBlob failed");   // a tainted canvas would land here
+  const slug = (doc.title || "valheim-plan").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "valheim-plan";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = slug + ".png";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return blob;
+}
+document.getElementById("pngBtn").onclick = async () => {
+  const b = document.getElementById("pngBtn");
+  b.textContent = "Rendering…";
+  try{ await exportPNG(); b.textContent = "Saved"; }
+  catch(e){ b.textContent = "Failed"; }
+  setTimeout(() => b.textContent = "Download PNG", 1600);
+};
+
+// ---------- read-only shared plans ----------
+function setRO(on){
+  RO = on;
+  document.querySelectorAll("[data-tool]").forEach(b => {
+    b.disabled = on && !["pan", "measure"].includes(b.dataset.tool);
+  });
+  for(const id of ["undoBtn", "clearBtn"]) document.getElementById(id).disabled = on;
+  titleIn.readOnly = on; notesIn.readOnly = on;
+  if(on) setTool("pan");
+}
+document.getElementById("copyPlanBtn").onclick = () => {
+  const mine = storedPlan();
+  if(mine && (mine.items || []).length && !confirm("Replace your own saved plan with this one?")) return;
+  setRO(false);
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("roBanner").hidden = true;
+  save(); renderCount();
+};
+document.getElementById("dismissBtn").onclick = () => {
+  const mine = storedPlan();
+  history.replaceState(null, "", location.pathname);
+  document.getElementById("roBanner").hidden = true;
+  doc = mine && mine.v === 1 ? mine : newDoc();
+  doc.layers = Object.assign({}, DEFAULT_LAYERS, doc.layers || {});
+  setRO(false); syncFields();
+  if(doc.view) centreOn(doc.view.x, doc.view.z, doc.view.zoom);
+  draw();
+};
+
+// ---------- live data ----------
+async function api(path){
+  const r = await fetch(API + path, {cache:"no-store"});
+  if(!r.ok) throw new Error(path + " " + r.status);
+  return r;
+}
+async function loadRefs(){
+  try{
+    const j = await api("/portals").then(r => r.json());
+    DATA.portals = j.portals || [];
+  }catch(e){}
+  try{
+    const j = await api("/graves").then(r => r.json());
+    DATA.graves = j.graves || [];
+  }catch(e){}
+  try{
+    const j = await api("/vehicles").then(r => r.json());
+    DATA.vehicles = j.vehicles || [];
+  }catch(e){}
+  try{
+    const csv = await api("/pins").then(r => r.text());
+    DATA.pins = csv.split("\n").filter(Boolean).map(line => {
+      const f = line.split(",");
+      if(f.length < 6) return null;
+      const x = parseFloat(f[4]), z = parseFloat(f[5]);
+      if(!isFinite(x) || !isFinite(z)) return null;
+      return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), x, z};
+    }).filter(Boolean);
+  }catch(e){}
+  draw();
+}
+async function loadPlayers(){
+  try{
+    const j = await api("/players").then(r => r.json());
+    DATA.players = (j.players || []).filter(p => p.x != null && p.z != null);
+    const n = j.count != null ? j.count : DATA.players.length;
+    document.getElementById("worldNote").innerHTML =
+      `<b>${GEOM.world}</b> · ${n} online · ${DATA.portals.length} portals, ${DATA.pins.length} pins.<br>Layers are live reference, not part of your plan.`;
+    draw();
+  }catch(e){}
+}
+
+// ---------- boot ----------
+async function boot(){
+  document.getElementById("buildstamp").textContent = "build " + BUILD;
+  computeFit();
+  if(!viewFromDoc) fitWorld();
+  try{
+    const c = await api("/config").then(r => r.json());
+    GEOM = {pixel:c.pixel_size || 12, size:c.texture_size || 2048, world:c.world_name || "Mothership"};
+  }catch(e){}
+  await loadRefs();
+  await loadPlayers();
+  setInterval(() => { if(document.visibilityState === "visible") loadPlayers(); }, 10000);
+  setInterval(() => { if(document.visibilityState === "visible") loadRefs(); }, 60000);
+}
+
+let viewFromDoc = false;
+async function start(){
+  let shared = null;
+  try{ shared = await decodeDoc(location.hash); }
+  catch(e){ shared = null; }
+  if(shared){
+    doc = shared;
+    setRO(true);
+    const b = document.getElementById("roBanner");
+    b.hidden = false;
+    document.getElementById("roWho").textContent = doc.title
+      ? `“${doc.title}” — read-only, so your own plan is untouched.`
+      : "opened read-only, so your own plan is untouched.";
+    if(!storedPlan()) document.getElementById("dismissBtn").hidden = true;
+  } else {
+    const mine = storedPlan();
+    if(mine && mine.v === 1){
+      doc = mine;
+      doc.layers = Object.assign({}, DEFAULT_LAYERS, doc.layers || {});
+      doc.items = Array.isArray(doc.items) ? doc.items : [];
+    }
+  }
+  syncFields();
+  if(doc.view && (doc.items.length || shared || doc.view.zoom !== 1)){
+    viewFromDoc = true;
+    centreOn(doc.view.x, doc.view.z, doc.view.zoom);
+  }
+  draw();
+  await boot();
+}
+start();
+
+// exposed for the headless checks and for whatever comes next
+window.PLAN = {get doc(){ return doc; }, snapshot, encodeDoc, decodeDoc, shareLink, exportPNG,
+               commit, setTool, centreOn, draw, render, view, toPx, toWorld, PALETTE, STAMPS,
+               get data(){ return DATA; }};
+</script>
+</body>
+</html>
