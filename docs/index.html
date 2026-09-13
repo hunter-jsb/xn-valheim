@@ -243,7 +243,6 @@
         <button id="zoomIn"  title="Zoom in">+</button>
         <button id="zoomOut" title="Zoom out">−</button>
         <button id="zoomFit" title="Fit">⌂</button>
-        <button id="structBtn" title="Rescan structures">⟳</button>
         <button id="helpBtn" title="Commands &amp; help">?</button>
         <button id="fsBtn"   title="Fullscreen">⛶</button>
       </div>
@@ -286,8 +285,8 @@
        still show in the online list, but never with a location.</p>
 
     <h3>Good to know</h3>
-    <p>Players and pins refresh every few seconds; structures and the explored
-       mask every couple of minutes.</p>
+    <p>Players and pins refresh every few seconds; builds and the explored mask
+       every minute while someone has the map open.</p>
   </div>
 </div>
 
@@ -602,19 +601,6 @@ function pinchState(){
 document.getElementById("zoomIn").onclick  = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1.35);
 document.getElementById("zoomOut").onclick = () => zoomAt(stage.clientWidth/2, stage.clientHeight/2, 1/1.35);
 document.getElementById("zoomFit").onclick = fitExplored;
-document.getElementById("structBtn").onclick = async (e) => {
-  const b = e.currentTarget;
-  b.disabled = true; b.textContent = "…";
-  try { await fetch(API+"/structures/refresh", {cache:"no-store"}); } catch(err){}
-  // the sweep runs on the server's own frames; give it a moment, then re-pull
-  setTimeout(() => {
-    const st=document.getElementById("mapStruct");
-    const p=new Image(); p.crossOrigin="anonymous";
-    p.onload=()=>{ st.src=p.src; b.disabled=false; b.textContent="⟳"; };
-    p.onerror=()=>{ b.disabled=false; b.textContent="⟳"; };
-    p.src = API+"/structures?"+Date.now();
-  }, 8000);
-}
 document.getElementById("fsBtn").onclick = () => {
   if(document.fullscreenElement) document.exitFullscreen();
   else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
@@ -640,7 +626,7 @@ let PORTALS = [];         // portals and the links between connected pairs
 let GRAVES = [];          // tombstones still standing, i.e. gear still out there
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13t";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-13u";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 let GEOM = {pixel: 12, size: 2048};
 
