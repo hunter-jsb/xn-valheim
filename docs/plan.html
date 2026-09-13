@@ -8,6 +8,7 @@
 <meta property="og:title" content="Xandaris Valheim — Plan">
 <meta property="og:description" content="Draw on the live world map and share the plan with your party.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
+<script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
   :root{
@@ -226,34 +227,9 @@
 
 <script>
 // ---------- icons ----------
-// [path, fill, strokeless?] — flat silhouettes with a dark halo, one hue per family,
-// lifted from the live map's sprite so a plan reads like the map it sits on.
-const ICONS = {
-  "karve":[["M6.4 3.2h11.2v7.6h-4.2v4h-2.8v-4H6.4z","#ae5139"],
-           ["M1.8 12.6h20.4c-1 4.4-4.8 7-10.2 7S2.8 17 1.8 12.6z","#d2a271"]],
-  "raft":[["M10 4.6h8.4v6.8h-6v3.2h-2.4z","#ae5139"],
-          ["M2.6 13.8h5.8v5.6H2.6zM9.3 13.8h5.8v5.6H9.3zM16 13.8h5.8v5.6H16z","#d2a271"]],
-  "longship":[["M4.6 2.4h14.8v8.2h-6v4.4h-2.8v-4.4H4.6z","#ae5139"],
-              ["M1.6 8.6c1.8.8 2.6 2.2 2.6 4.2h15.6c0-2 .8-3.4 2.6-4.2-.8 2-.4 3.6 0 5.2-.8 4.4-5 6.8-10.4 6.8S2.4 18.2 1.6 13.8c.4-1.6.8-3.2 0-5.2z","#d2a271"]],
-  "cart":[["M16.6 7 21 3.6l1.4 2-4.4 3.4z","#c08a4a"],
-          ["M2.2 6.6h17.2l-2.4 7.6H4.6z","#c08a4a"],
-          ["M5.1 17a2.9 2.9 0 1 0 5.8 0a2.9 2.9 0 1 0-5.8 0","#e3bd85"],
-          ["M12.5 17a2.9 2.9 0 1 0 5.8 0a2.9 2.9 0 1 0-5.8 0","#e3bd85"]],
-  "portal":[["M4.4 20.6v-9a7.6 7.6 0 0 1 15.2 0v9h-4.4v-9a3.2 3.2 0 0 0-6.4 0v9z","#6fd8e6"],
-            ["M9.6 20.6v-9a2.4 2.4 0 0 1 4.8 0v9z","rgba(111,216,230,.38)",1]],
-  "grave":[["M12 3.2c-4.9 0-8.4 3.3-8.4 7.9 0 2.7 1.3 4.7 3 5.8v2.1c0 1 .8 1.8 1.8 1.8h7.2c1 0 1.8-.8 1.8-1.8v-2.1c1.7-1.1 3-3.1 3-5.8 0-4.6-3.5-7.9-8.4-7.9z","#d9c7a6"],
-           ["M5.9 11.2a2.5 2.8 0 1 0 5 0a2.5 2.8 0 1 0-5 0","#14130e",1],
-           ["M13.1 11.2a2.5 2.8 0 1 0 5 0a2.5 2.8 0 1 0-5 0","#14130e",1],
-           ["M12 14.2 13.6 17h-3.2z","#14130e",1]],
-  "pin-dot":[["M6.2 12a5.8 5.8 0 1 0 11.6 0a5.8 5.8 0 1 0-11.6 0","#e8b45f"]],
-  "pin-fire":[["M13 2.4c.8 4-1.6 5.2-3.4 7.2-2 2.2-3.2 4.4-3.2 6.6 0 3.6 2.6 6 5.6 6s5.6-2.4 5.6-6c0-4.4-2.8-8.6-4.6-13.8z","#ef8b3f"],
-              ["M12 11.6c2 2.2 3 3.6 3 5 0 1.8-1.3 3-3 3s-3-1.2-3-3c0-1.4 1-2.8 3-5z","#f8cf72",1]],
-  "pin-mine":[["M5.8 18.8 9 21 16.8 9.4 13.6 7.2z","#c2914b"],
-              ["M8.6 4.2Q20.4 1.2 21.6 13 15.2 8 8.6 4.2z","#e8b45f"]],
-  "pin-house":[["M12 3.2 22 12h-3.2v8.4H5.2V12H2z","#e8b45f"],
-               ["M10.2 20.4v-5.2h3.6v5.2z","#14130e",1]],
-  "pin-cave":[["M1.8 20.6 6.4 11.4 9.2 13.4 13 7.6 16.8 13.2 18.8 11.6 22.2 20.6z","#e8b45f"],
-              ["M8.4 20.6c0-3.8 1.6-6.2 3.6-6.2s3.6 2.4 3.6 6.2z","#14130e",1]],
+// The marker families are map-core's own sprite, so a stamp on a plan is the
+// same silhouette as the marker on the live map.
+const ICONS = Object.assign({}, MapCore.ICONS, {
   "danger":[["M12 2.6 23 20.8H1z","#e05b4a"],
             ["M10.9 8.2h2.2l-.45 6.4h-1.3z","#14130e",1],
             ["M10.5 17.4a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0","#14130e",1]],
@@ -269,13 +245,9 @@ const ICONS = {
            ["M6.4 7.6 8.9 10.1M9.4 4.6l2.5 2.5M11.5 12.7 14 15.2M14.5 9.7l2.5 2.5","#14130e",1]],
   "erase":[["M9.6 21.4 2.6 14.4 13.4 3.6l7 7z","#e05b4a"],["M7.6 11.4 14.6 18.4l-2.9 3H9.6l-6-6z","#e7e2d4"]],
   "hand":[["M6 11V5.6a1.7 1.7 0 0 1 3.4 0V4a1.7 1.7 0 0 1 3.4 0v1a1.7 1.7 0 0 1 3.4 0v1.6a1.7 1.7 0 0 1 3.4 0V14c0 4.4-3 7.4-7.2 7.4-3 0-5-1.4-6.6-4L3 13.4c-.7-1.2 1-2.6 2-1.5z","#e7e2d4"]],
-};
-const ICON_PATHS = {};
-for(const k in ICONS) ICON_PATHS[k] = ICONS[k].map(p => [new Path2D(p[0]), p[1], p[2]]);
-document.getElementById("icons").innerHTML = Object.keys(ICONS).map(k =>
-  `<symbol id="ic-${k}" viewBox="0 0 24 24" stroke="#0b0e0b" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">`
-  + ICONS[k].map(p => `<path d="${p[0]}" fill="${p[1]}"${p[2] ? ' stroke="none"' : ""}/>`).join("")
-  + `</symbol>`).join("");
+});
+const ICON_PATHS = MapCore.iconPaths(ICONS);
+MapCore.injectSprite(document.getElementById("icons"), ICONS);
 const svgIcon = (k, s) => `<svg style="width:${s||18}px;height:${s||18}px"><use href="#ic-${k}"></use></svg>`;
 
 // ---------- geometry ----------
@@ -283,12 +255,12 @@ const svgIcon = (k, s) => `<svg style="width:${s||18}px;height:${s||18}px"><use 
 // stored in world metres, projected to texture px, then to the screen, so a route
 // drawn at world zoom sits on the same rock at build zoom.
 const API = "https://valheim-proxy.hunterjsb.workers.dev";
-const BUILD = "2026-09-13p";
-let GEOM = {pixel:12, size:2048, world:"Mothership"};
-const toPx = (x,z) => [x/GEOM.pixel + GEOM.size/2, GEOM.size/2 - z/GEOM.pixel];
-const toWorld = (px,py) => [(px - GEOM.size/2)*GEOM.pixel, (GEOM.size/2 - py)*GEOM.pixel];
+const BUILD = "2026-09-13pb";
+const GEOM = MapCore.geom;
+const toPx = (x,z) => { const p = MapCore.toPx(x,z); return [p.px, p.py]; };
+const toWorld = (px,py) => { const w = MapCore.toWorld(px,py); return [w.x, w.z]; };
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
-const MAX_ZOOM = 120;
+const MAX_ZOOM = MapCore.MAX_ZOOM;
 let scale = 1, tx = 0, ty = 0, fit = 1;
 
 const stage = document.getElementById("stage");
@@ -323,43 +295,21 @@ function pushUndo(){
 
 // ---------- reference data ----------
 const DATA = {portals:[], graves:[], vehicles:[], pins:[], players:[]};
-const RASTER = {};
-for(const [k, url] of [["base","/base-6f3a9c2e?v=4k"], ["fog","/fog"], ["forest","/forest"], ["struct","/structures"]]){
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.addEventListener("load", () => { draw(); if(k === "fog") fogReady(); });
-  img.src = API + url;
-  RASTER[k] = img;
-}
+// Builds are footprints, drawn exactly as the live map draws them; the fog says
+// which of them stand in ground someone has actually walked.
+let PIECES = null, PIECES_ALL = null;
+function refilterPieces(){ PIECES = PIECES_ALL && MapCore.filterExplored(PIECES_ALL, RASTER.imgs.fog); }
+const RASTER = MapCore.layers(API, k => { if(k === "fog"){ refilterPieces(); fogReady(); } draw(); });
 
 // ---------- render ----------
 // One pass paints everything, and the PNG export runs the same pass at 2x, so what
 // gets shared is exactly what is on screen.
 function render(g, W, H, v, o){
   o = o || {};
-  const pix = o.pix || 1;
-  g.setTransform(pix, 0, 0, pix, 0, 0);
-  g.globalCompositeOperation = "source-over";
-  g.fillStyle = "#0a0c0a"; g.fillRect(0, 0, W, H);
-  const sx = -v.tx/v.scale, sy = -v.ty/v.scale, sw = W/v.scale, sh = H/v.scale;
-  const blit = (img, smooth, op) => {
-    if(!img || !img.complete || !img.naturalWidth) return;
-    const k = img.naturalWidth/GEOM.size;          // source px per texture px
-    g.imageSmoothingEnabled = smooth;
-    g.globalCompositeOperation = op;
-    try{ g.drawImage(img, sx*k, sy*k, sw*k, sh*k, 0, 0, W, H); }catch(e){}
-  };
-  // The base render is the whole world: it is never on screen without the fog
-  // mask over it, so until the fog has decoded the ground stays dark.
-  const fogIn = RASTER.fog && RASTER.fog.complete && RASTER.fog.naturalWidth;
-  if(fogIn){
-    blit(RASTER.base, v.scale < 3, "source-over");
-    // multiplied twice, which squares the effect: dense woods go markedly darker
-    // while a thinned patch barely moves, so the difference reads at a glance
-    if(doc.layers.forest){ blit(RASTER.forest, true, "multiply"); blit(RASTER.forest, true, "multiply"); }
-    if(doc.layers.builds) blit(RASTER.struct, true, "source-over");
-    blit(RASTER.fog, true, "multiply");             // unexplored ground stays dark
-  }
+  const view = {scale:v.scale, tx:v.tx, ty:v.ty, w:W, h:H, pix:o.pix || 1};
+  MapCore.drawRasters(g, view, RASTER.imgs, {forest:doc.layers.forest});
+  if(doc.layers.builds && PIECES)
+    MapCore.drawPieces(g, view, PIECES, {plan:v.scale >= MapCore.PLAN_ZOOM});
   g.globalCompositeOperation = "source-over";
   g.imageSmoothingEnabled = true;
 
@@ -417,11 +367,12 @@ function drawRefs(g, v, W, H){
   }
   if(doc.layers.vehicles) for(const m of DATA.vehicles){
     const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
-    drawIcon(g, vehicleIcon(m), x, y, m.kind === "cart" ? 16 : 18);
+    const st = MapCore.vehicleStyle(m);
+    drawIcon(g, st.icon, x, y, st.size);
   }
   if(doc.layers.pins) for(const m of DATA.pins){
     const [x, y] = project(v, m.x, m.z); if(!on(x, y)) continue;
-    drawIcon(g, PIN_ICON[m.type] || "pin-dot", x, y, 17);
+    drawIcon(g, MapCore.PIN_ICON[m.type] || "pin-dot", x, y, 17);
     if(m.text) haloText(g, m.text, x, y + 15, "#e8b45f", 11);
   }
   if(doc.layers.players) for(const m of DATA.players){
@@ -432,9 +383,6 @@ function drawRefs(g, v, W, H){
     haloText(g, m.name, x, y + 14, "#ffffff", 11);
   }
 }
-const PIN_ICON = {dot:"pin-dot", fire:"pin-fire", mine:"pin-mine", house:"pin-house", cave:"pin-cave"};
-const VEH_ICON = {raft:"raft", karve:"karve", vikingship:"longship", cart:"cart"};
-const vehicleIcon = m => VEH_ICON[(m.name || "").toLowerCase()] || (m.kind === "cart" ? "cart" : "karve");
 
 // ---------- items ----------
 // t: pen | line | arrow | rect | circle | text | stamp
@@ -577,7 +525,7 @@ function fitExplored(){
   c.width = c.height = N;
   const g = c.getContext("2d", {willReadFrequently:true});
   let d;
-  try{ g.drawImage(RASTER.fog, 0, 0, N, N); d = g.getImageData(0, 0, N, N).data; }
+  try{ g.drawImage(RASTER.imgs.fog, 0, 0, N, N); d = g.getImageData(0, 0, N, N).data; }
   catch(e){ return fitWorld(); }
   let x0 = N, y0 = N, x1 = -1, y1 = -1;
   for(let y = 0; y < N; y++) for(let x = 0; x < N; x++) if(d[(y*N+x)*4] > 40){
@@ -1002,45 +950,21 @@ document.getElementById("dismissBtn").onclick = () => {
 };
 
 // ---------- live data ----------
-async function api(path){
-  const r = await fetch(API + path, {cache:"no-store"});
-  if(!r.ok) throw new Error(path + " " + r.status);
-  return r;
-}
-async function loadRefs(){
-  try{
-    const j = await api("/portals").then(r => r.json());
-    DATA.portals = j.portals || [];
-  }catch(e){}
-  try{
-    const j = await api("/graves").then(r => r.json());
-    DATA.graves = j.graves || [];
-  }catch(e){}
-  try{
-    const j = await api("/vehicles").then(r => r.json());
-    DATA.vehicles = j.vehicles || [];
-  }catch(e){}
-  try{
-    const csv = await api("/pins").then(r => r.text());
-    DATA.pins = csv.split("\n").filter(Boolean).map(line => {
-      const f = line.split(",");
-      if(f.length < 6) return null;
-      const x = parseFloat(f[4]), z = parseFloat(f[5]);
-      if(!isFinite(x) || !isFinite(z)) return null;
-      return {type:f[2], owner:f[3], text:f.slice(6).join(",").trim(), x, z};
-    }).filter(Boolean);
-  }catch(e){}
+// One /state a tick carries every reference layer, and the big rasters and the
+// builds are refetched only when their own revision moves.
+async function tick(){
+  let s;
+  try{ s = await MapCore.fetchState(API); }catch(e){ return; }
+  DATA.portals  = (s.portals || {}).portals || [];
+  DATA.graves   = (s.graves || {}).graves || [];
+  DATA.vehicles = (s.vehicles || {}).vehicles || [];
+  DATA.pins     = MapCore.parsePins(s.pins);
+  DATA.players  = ((s.players || {}).players || []).filter(p => p.x != null && p.z != null);
+  const n = (s.players || {}).count != null ? s.players.count : DATA.players.length;
+  document.getElementById("worldNote").innerHTML =
+    `<b>${MapCore.esc(GEOM.world)}</b> · ${n} online · ${DATA.portals.length} portals, ${DATA.pins.length} pins.<br>Layers are live reference, not part of your plan.`;
+  await RASTER.sync(s.rev, {pieces: list => { PIECES_ALL = list; refilterPieces(); }});
   draw();
-}
-async function loadPlayers(){
-  try{
-    const j = await api("/players").then(r => r.json());
-    DATA.players = (j.players || []).filter(p => p.x != null && p.z != null);
-    const n = j.count != null ? j.count : DATA.players.length;
-    document.getElementById("worldNote").innerHTML =
-      `<b>${GEOM.world}</b> · ${n} online · ${DATA.portals.length} portals, ${DATA.pins.length} pins.<br>Layers are live reference, not part of your plan.`;
-    draw();
-  }catch(e){}
 }
 
 // ---------- boot ----------
@@ -1048,14 +972,10 @@ async function boot(){
   document.getElementById("buildstamp").textContent = "build " + BUILD;
   computeFit();
   if(!viewFromDoc) fitWorld();
-  try{
-    const c = await api("/config").then(r => r.json());
-    GEOM = {pixel:c.pixel_size || 12, size:c.texture_size || 2048, world:c.world_name || "Mothership"};
-  }catch(e){}
-  await loadRefs();
-  await loadPlayers();
-  setInterval(() => { if(document.visibilityState === "visible") loadPlayers(); }, 10000);
-  setInterval(() => { if(document.visibilityState === "visible") loadRefs(); }, 60000);
+  RASTER.loadBase();
+  try{ await MapCore.fetchConfig(API); }catch(e){}
+  await tick();
+  setInterval(() => { if(document.visibilityState === "visible") tick(); }, 10000);
 }
 
 let viewFromDoc = false;
@@ -1093,7 +1013,7 @@ start();
 // exposed for the headless checks and for whatever comes next
 window.PLAN = {get doc(){ return doc; }, snapshot, encodeDoc, decodeDoc, shareLink, exportPNG,
                commit, setTool, centreOn, draw, render, view, toPx, toWorld, PALETTE, STAMPS,
-               get data(){ return DATA; }};
+               get data(){ return DATA; }, get pieces(){ return PIECES; }};
 </script>
 </body>
 </html>
