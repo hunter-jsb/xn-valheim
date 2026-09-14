@@ -6,4 +6,5 @@ dependencies = [
     "requests>=2.31",
     "python-socketio[client]>=5.11",
     "python-a2s>=1.4",
+    "paramiko>=3.4",
 ]

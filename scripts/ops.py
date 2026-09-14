@@ -12,9 +12,11 @@ Auth from env: IB_EMAIL + IB_PASSWORD  (or IB_SESSION = an indifferentSess cooki
   uv run --project scripts scripts/ops.py update              # game version, waits it out
   uv run --project scripts scripts/ops.py announce "back in 5"
   uv run --project scripts scripts/ops.py restart --warn 60 --reason "map mod update"
+  uv run --project scripts scripts/ops.py deploy-web          # the viewer, from ../valheim-webmap/WebMap/web
+  uv run --project scripts scripts/ops.py deploy-mod ../valheim-webmap/dist/WebMap.dll
 
 announce needs ANNOUNCE_TOKEN (the secret in the mod's announce.token) and
-optionally WEBMAP_URL.
+optionally WEBMAP_URL. The deploys need IB_SFTP_HOST/PORT/USER/PASS.
 """
 from __future__ import annotations
 
@@ -158,11 +160,57 @@ def _client() -> IBClient:
     return c
 
 
+# ---- deploys over SFTP --------------------------------------------------------
+# The mod (WebMap.dll) and its viewer (the web/ folder) go up by SFTP, each file
+# written as .new and renamed over the old one, so the server never reads half a
+# file. A new dll loads at the next restart; the viewer shows at once, the mod's
+# cache_server_files being off on our server.
+PLUGIN_DIR = "steamcmd/valheim/BepInEx/plugins/WebMap"
+MOD_REPO = Path(__file__).resolve().parents[2] / "valheim-webmap"
+
+
+def _sftp():
+    import paramiko  # only the deploys need it
+    t = paramiko.Transport((os.environ["IB_SFTP_HOST"], int(os.environ["IB_SFTP_PORT"])))
+    t.connect(username=os.environ["IB_SFTP_USER"], password=os.environ["IB_SFTP_PASS"])
+    return t, paramiko.SFTPClient.from_transport(t)
+
+
+def _put(sf, src: Path, dst: str):
+    sf.put(str(src), dst + ".new")
+    sf.posix_rename(dst + ".new", dst)
+    print(f"{dst}  {src.stat().st_size} b")
+
+
+def deploy_web(src: str):
+    d = Path(src) if src else MOD_REPO / "WebMap" / "web"
+    if not (d / "index.html").is_file():
+        sys.exit(f"{d}: no index.html there")
+    t, sf = _sftp()
+    try:
+        for f in sorted(p for p in d.iterdir() if p.is_file()):
+            _put(sf, f, f"{PLUGIN_DIR}/web/{f.name}")
+    finally:
+        t.close()
+
+
+def deploy_mod(dll: str):
+    p = Path(dll)
+    if p.suffix != ".dll" or not p.is_file():
+        sys.exit("usage: ops.py deploy-mod path/to/WebMap.dll")
+    t, sf = _sftp()
+    try:
+        _put(sf, p, f"{PLUGIN_DIR}/{p.name}")
+    finally:
+        t.close()
+    print("it loads at the next restart: ops.py restart --drain")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["status", "start", "stop", "restart",
                                     "backup", "rcon", "admins", "activity",
-                                    "announce", "update"])
+                                    "announce", "update", "deploy-web", "deploy-mod"])
     ap.add_argument("arg", nargs="?", default="")
     ap.add_argument("--game", default="Valheim")
     ap.add_argument("--warn", type=int, metavar="SECONDS",
@@ -173,6 +221,12 @@ def main():
                          "(default 300s) before restarting. Prefer this to --warn "
                          "whenever anyone is online -- see drain().")
     a = ap.parse_args()
+
+    # the deploys talk SFTP, not the panel: no login needed
+    if a.cmd == "deploy-web":
+        return deploy_web(a.arg)
+    if a.cmd == "deploy-mod":
+        return deploy_mod(a.arg)
 
     c = _client()
     sv = c.find(a.game)

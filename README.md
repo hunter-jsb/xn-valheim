@@ -27,6 +27,8 @@ export IB_PASSWORD=...            # or export IB_SESSION=<indifferentSess cookie
 
 uv run --project scripts scripts/ops.py status
 uv run --project scripts scripts/ops.py restart
+uv run --project scripts scripts/ops.py deploy-web      # the viewer, straight to the mod's web folder
+uv run --project scripts scripts/ops.py deploy-mod ../valheim-webmap/dist/WebMap.dll
 uv run --project scripts scripts/collect.py --game Valheim   # refresh the page data
 
 cd pulumi && pulumi preview       # diff role/ban/allow lists vs. the live server
