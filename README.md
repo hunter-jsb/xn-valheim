@@ -15,7 +15,7 @@ Valheim hit **1.0 (Deep North)** on 2026-09-09; this server runs on it.
 | [`ib/`](ib) | Python client for that API (login, files, config, backups, RCON, stats) |
 | [`pulumi/`](pulumi) | State-as-code: role/ban/allow lists reconciled onto the server |
 | [`scripts/`](scripts) | Ops CLI (`restart`, `backup`, `rcon`, `status`) + the metrics collector |
-| [`docs/`](docs) | The GitHub Page: the live world map (`index.html`), the portal atlas (`portals.html`), the planning board (`plan.html`), and per-player tallies (`players.html`) |
+| [`site/`](site) | Our `site-config.js` for the map site. The site itself is the mod's bundled viewer (`WebMap/web` in [valheim-webmap](https://github.com/hunter-jsb/valheim-webmap)); the `site` workflow deploys it to the GitHub Page with this config on top |
 | [`worker/`](worker) | The Cloudflare Worker that fronts the mod's HTTP API for the page: HTTPS, CORS, a path allowlist, edge caching |
 | [`.github/workflows/`](.github/workflows) | Cron job that refreshes the metrics data |
 

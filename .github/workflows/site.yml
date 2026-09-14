@@ -1,0 +1,55 @@
+# The map site is the mod's own viewer (hunter-jsb/valheim-webmap, WebMap/web).
+# This deploys that viewer to our Pages with our site-config.js on top, so there
+# is no copy of the site here: a change to the viewer redeploys ours within a
+# quarter hour, or at once by hand.
+name: site
+on:
+  push:
+    branches: [master]
+    paths: ['site/**', '.github/workflows/site.yml']
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: valheim-webmap ref to deploy
+        default: main
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch the viewer from the mod
+        env:
+          REF: ${{ github.event.inputs.ref || 'main' }}
+        run: |
+          set -euo pipefail
+          SRC="https://raw.githubusercontent.com/hunter-jsb/valheim-webmap/${REF}/WebMap/web"
+          mkdir -p out
+          for f in index.html portals.html plan.html players.html map-core.js site.css; do
+            curl -sfL -o "out/$f" "$SRC/$f"
+          done
+          cp site/site-config.js out/site-config.js
+          # crawler-facing text is ours here; the viewer's own is generic
+          sed -i 's|<title>Valheim WebMap</title>|<title>Xandaris Valheim</title>|; s|content="Valheim WebMap"|content="Xandaris Valheim"|g' out/*.html
+          echo "deployed $(curl -sfL "https://api.github.com/repos/hunter-jsb/valheim-webmap/commits/${REF}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["sha"][:7])')" > out/version.txt
+          ls -la out
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
