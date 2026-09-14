@@ -12,14 +12,33 @@
 const MapCore = (() => {
 "use strict";
 
+// ---------- the deployment ----------
+// site-config.js, loaded before this file, is the one thing a deployment edits:
+// where the server is, what the world render is called, whose name is on the bar.
+// Absent or partial, the defaults are the mod serving these pages itself -- the
+// API same-origin, the render its own /map.jpg, no brand and no links but its own.
+const XNV = (typeof window !== "undefined" && window.XNV) || {};
+const cfg = {
+  api:    XNV.api || "",
+  base:   XNV.base || "/map.jpg",
+  brand:  XNV.brand || null,
+  links:  Array.isArray(XNV.links) ? XNV.links
+          : [{label: "Map mod", href: "https://github.com/hunter-jsb/valheim-webmap"}],
+  status: XNV.status || null,
+  repo:   XNV.repo || null,
+};
+
 // ---------- geometry ----------
 // The map is a square texture of the world: 2048 px at 12 m a pixel, per /config.
 const geom = {pixel: 12, size: 2048, world: "Mothership"};
+let worldName = null;                   // what the server calls its world, once it has said
 function setGeom(c){
   c = c || {};
   geom.pixel = c.pixel_size || 12;
   geom.size  = c.texture_size || 2048;
   geom.world = c.world_name || "Mothership";
+  worldName = c.world_name || worldName;
+  if(navEl) nav(navPage, navEl);        // an unbranded deployment wears the world's own name
   return geom;
 }
 // world -> texture pixels, the same transform the mod's own UI uses
@@ -30,9 +49,10 @@ function toWorld(px, py){ return {x: (px - geom.size/2)*geom.pixel, z: (geom.siz
 // would be a smudge. At 120 a 2 m piece is 20 px and a plan can be read.
 const PLAN_ZOOM = 16, MAX_ZOOM = 120;
 
-// ---------- the server, through the Worker ----------
-// No committed snapshots: both pages read the game server through a Cloudflare
-// Worker that adds HTTPS + CORS.
+// ---------- the server ----------
+// No committed snapshots: a page reads the game server live, at cfg.api -- our
+// deployment through a Cloudflare Worker that adds HTTPS + CORS, the mod's own
+// viewer at its own origin.
 async function api(base, path){
   const r = await fetch(base + path, {cache: "no-store"});
   if(!r.ok) throw new Error(path + " " + r.status);
@@ -48,7 +68,7 @@ async function fetchConfig(base){ return setGeom(await fetchJSON(base, "/config"
 // The rasters are megabytes; a revision in /state says when one actually moved,
 // and ?v=<rev> lets the edge keep that version for an hour. A replacement decodes
 // off screen and is swapped in, so a refresh never blanks the map.
-const BASE_TEX = "/base-6f3a9c2e";      // the world render, versioned by hand
+const BASE_TEX = cfg.base;              // the world render, versioned by hand
 function layers(base, onLoad){
   const imgs = {}, rev = {};
   for(const k of ["base", "forest", "struct", "fog", "chart"]){
@@ -321,28 +341,48 @@ function ago(iso){
 }
 function esc(t){ return String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-// ---------- the site header ----------
+// ---------- the site chrome ----------
 // Four pages wear the same bar, so a link added here reaches all of them; the
-// rules it needs are in site.css.
+// rules it needs are in site.css. Whose name it carries and where it points out
+// to are the deployment's, not this file's.
 const NAV_PAGES = [["index", "Map"], ["portals", "Portals"], ["plan", "Plan"], ["players", "Players"]];
-const NAV_EXT = [["https://xnmc.statuspage.io", "Status"],
-                 ["https://discord.gg/UDGfVrTQs6", "Discord"],
-                 ["https://github.com/hunter-jsb/valheim-webmap", "Map mod"]];
+let navEl = null, navPage = "";
+// Nameless until the world names itself, and "Valheim" until even that arrives.
+function brand(){ return cfg.brand || worldName || "Valheim"; }
+// The map is the world's own page and wears both names; the rest are "<page> -- <brand>".
+function setTitle(page){
+  const row = NAV_PAGES.find(p => p[0] === page);
+  document.title = (!row || page === "index")
+    ? (cfg.brand && worldName ? cfg.brand + " \u2014 " + worldName : brand())
+    : row[1] + " \u2014 " + brand();
+}
+// The footer credits whoever runs this one; a deployment that names no repo has none.
+function credits(){
+  for(const el of document.querySelectorAll(".credits")){
+    if(!cfg.repo){ el.style.display = "none"; continue; }
+    for(const a of el.querySelectorAll("a.repo")) a.href = cfg.repo;
+  }
+}
 // current defaults to the nav element's data-page
 function nav(current, el){
   el = el || document.querySelector("nav.nav");
   if(!el) return null;
   current = current || el.dataset.page || "";
+  navEl = el; navPage = current;
   const mark = p => p === current ? ' class="here" aria-current="page"' : "";
-  el.innerHTML = '<span class="brand">Xandaris Valheim</span><div class="navlinks">'
+  el.innerHTML = '<span class="brand">' + esc(brand()) + '</span><div class="navlinks">'
     + NAV_PAGES.map(([p, label]) => `<a${mark(p)} href="${p}.html">${label}</a>`).join("")
     + '<span class="ext">'
-    + NAV_EXT.map(([href, label]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`).join("")
+    + cfg.links.map(l => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("")
     + '</span></div>';
+  setTitle(current);
+  if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", credits, {once: true});
+  else credits();
   return el;
 }
 
-return {geom, setGeom, toPx, toWorld, PLAN_ZOOM, MAX_ZOOM,
+return {cfg, brand, setTitle, credits,
+        geom, setGeom, toPx, toWorld, PLAN_ZOOM, MAX_ZOOM,
         api, fetchJSON, fetchState, fetchConfig, layers, BASE_TEX,
         drawRasters, kindOf, ORDER, shade, parsePieces, filterExplored, drawPieces,
         ICONS, spriteSVG, injectSprite, iconPaths, VEHICLE, vehicleStyle, PIN_ICON,

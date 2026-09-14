@@ -9,6 +9,7 @@
 <meta property="og:description" content="Draw on the live world map and share the plan with your party.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
 <link rel="stylesheet" href="site.css">
+<script src="site-config.js"></script>
 <script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -170,8 +171,8 @@
     </div>
     <div class="sidefoot">
       <span id="buildstamp"></span> ·
-      <a href="index.html">live map</a> ·
-      <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a>
+      <a href="index.html">live map</a><span class="credits"> ·
+      <a class="repo" href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></span>
     </div>
   </aside>
 
@@ -224,8 +225,8 @@ const svgIcon = (k, s) => `<svg style="width:${s||18}px;height:${s||18}px"><use 
 // The map is a square texture of the world: 2048 px at 12 m a pixel. Drawings are
 // stored in world metres, projected to texture px, then to the screen, so a route
 // drawn at world zoom sits on the same rock at build zoom.
-const API = "https://valheim-proxy.hunterjsb.workers.dev";
-const BUILD = "2026-09-13pc";
+const API = MapCore.cfg.api;
+const BUILD = "2026-09-14pa";
 const GEOM = MapCore.geom;
 const toPx = (x,z) => { const p = MapCore.toPx(x,z); return [p.px, p.py]; };
 const toWorld = (px,py) => { const w = MapCore.toWorld(px,py); return [w.x, w.z]; };

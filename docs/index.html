@@ -9,6 +9,7 @@
 <meta property="og:description" content="Live world map and status for the Xandaris Valheim server.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
 <link rel="stylesheet" href="site.css">
+<script src="site-config.js"></script>
 <script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -164,7 +165,7 @@
 <div class="app">
   <aside class="sidebar" id="sidebar">
     <div class="statusrow">
-      <a class="status" id="status" href="https://xnmc.statuspage.io" target="_blank" rel="noopener">
+      <a class="status" id="status" target="_blank" rel="noopener">
         <span class="shead"><span class="dot" id="sdot"></span><b id="stext">checking…</b></span>
         <span class="srows" id="srows"></span>
       </a>
@@ -188,9 +189,9 @@
     </div>
     <p class="stamp" id="stamp"></p>
     <div class="sidefoot">
-      <span id="buildstamp"></span> ·
-      <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a> ·
-      <a href="https://indifferentbroccoli.com/valheim-server-hosting">indifferent broccoli</a>
+      <span id="buildstamp"></span><span class="credits"> ·
+      <a class="repo" href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a> ·
+      <a href="https://indifferentbroccoli.com/valheim-server-hosting">indifferent broccoli</a></span>
     </div>
   </aside>
 
@@ -503,11 +504,11 @@ document.getElementById("helpClose").addEventListener("click", () => showHelp(fa
 helpEl.addEventListener("click", e => { if(e.target === helpEl) showHelp(false); });
 addEventListener("keydown", e => { if(e.key === "Escape") showHelp(false); });
 
-// ---------- live data (straight from the server via the Worker) ----------
-// No committed snapshots: the page reads the game server through a Cloudflare
-// Worker that adds HTTPS + CORS. Polling is gated on tab visibility so a
-// forgotten tab costs nothing.
-const API = "https://valheim-proxy.hunterjsb.workers.dev";
+// ---------- live data (straight from the server) ----------
+// No committed snapshots: the page reads the game server at the deployment's own
+// API base -- ours a Cloudflare Worker that adds HTTPS + CORS, the mod's viewer
+// same-origin. Polling is gated on tab visibility so a forgotten tab costs nothing.
+const API = MapCore.cfg.api;
 // any layer arriving or refreshing is a redraw; a fresh fog also re-tests which
 // builds stand in ground someone has walked
 const LAYERS = MapCore.layers(API, k => { if(k === "fog" && PIECES_ALL) refilterPieces(); else drawRaster(); });
@@ -517,15 +518,17 @@ let GRAVES = [];          // tombstones still standing, i.e. gear still out ther
 let TRADERS = [];         // Haldor, Hildir, the Bog Witch: only those in walked ground
 let PIECES = null;        // every placed piece as a footprint; replaces the raster when present
 let FOREST = {};          // /forest/stats: trees standing, stumps cut
-const BUILD = "2026-09-13zd";   // shown in the footer, so a stale page is obvious
+const BUILD = "2026-09-14a";   // shown in the footer, so a stale page is obvious
 let PLAYERS = {}, PINS = [], EXPLORED = null;
 const GEOM = MapCore.geom;
 
 const esc = MapCore.esc;
 function tile(k,v,sub){ return `<div class="tile"><div class="k">${k}</div><div class="v">${v}${sub?` <small>${sub}</small>`:""}</div></div>`; }
 // Statuspage summary, rendered in the site's own styling rather than their
-// floating widget. Their v2 API is CORS-open, so no proxy is involved.
-const STATUS_JSON = "https://xnmc.statuspage.io/api/v2/summary.json";
+// floating widget. Their v2 API is CORS-open, so no proxy is involved. A
+// deployment with no status page keeps the box: it carries the live pill alone.
+const STATUS_JSON = MapCore.cfg.status;
+if(STATUS_JSON){ try{ document.getElementById("status").href = new URL(STATUS_JSON).origin; }catch(e){} }
 let LIVE_UP = null;                        // our own 5s probe: fresher than the 15min cron
 const CLS = {operational:"ok", degraded_performance:"warn", partial_outage:"warn",
              major_outage:"bad", under_maintenance:"warn"};
@@ -624,8 +627,10 @@ async function boot(){
   applyHash();                 // needs the portals list, which the first tick brings
   // visibility-gated so a background tab makes no requests
   setInterval(()=>{ if(document.visibilityState==="visible") tickState(); }, 5000);
-  tickStatus();
-  setInterval(()=>{ if(document.visibilityState==="visible") tickStatus(); }, 60000);
+  if(STATUS_JSON){
+    tickStatus();
+    setInterval(()=>{ if(document.visibilityState==="visible") tickStatus(); }, 60000);
+  }
   document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") tickState(); });
 }
 

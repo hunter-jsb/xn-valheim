@@ -9,6 +9,7 @@
 <meta property="og:description" content="Every hub and the places it reaches, linked now or one retag away, drawn on the world.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪓</text></svg>">
 <link rel="stylesheet" href="site.css">
+<script src="site-config.js"></script>
 <script src="map-core.js"></script>
 <style>
   *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -159,12 +160,12 @@
     &#183; drag to pan, scroll to zoom</p>
 
   <div class="list" id="list"></div>
-  <p class="foot"><span id="stamp"></span> &#183; a node opens the map on that portal &#183;
-    <a href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></p>
+  <p class="foot"><span id="stamp"></span> &#183; a node opens the map on that portal<span class="credits"> &#183;
+    <a class="repo" href="https://github.com/hunter-jsb/xn-valheim">state-as-code</a></span></p>
 </main>
 
 <script>
-const API = "https://valheim-proxy.hunterjsb.workers.dev";
+const API = MapCore.cfg.api;
 const SITE_R = 80;    // portals this close stand at one place
 const PIN_R  = 120;   // a house pin this close gives that place its name
 const ZMAX   = 6;     // two sites are 80 m apart at the closest: past this there is nothing left to separate
