@@ -26,6 +26,7 @@ const ROUTES = {
   "/fog":      { ttl: 5, image: true, versioned: true, vttl: 3600 },
   "/chart":    { ttl: 60, image: true, versioned: true, vttl: 86400 },   // one flat biome chart per world
   "/forest": { ttl: 60, image: true, versioned: true, vttl: 3600 },
+  "/trails": { ttl: 60, image: true, versioned: true, vttl: 3600 },   // where people walk, a sweep at a time
   "/structures": { ttl: 30, image: true, versioned: true, vttl: 3600 },
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
