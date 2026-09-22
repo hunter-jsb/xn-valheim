@@ -54,7 +54,7 @@ function cors() {
 // The few things a signed-in member may change. Each is forwarded to the mod with
 // the shared write token (WRITE_TOKEN, the mod's announce token) and who did it,
 // so the mod never sees Discord and the token never reaches a browser.
-const WRITES = new Set(["/names"]);
+const WRITES = new Set(["/names", "/pins"]);   // naming a place; placing, changing or taking up a pin
 async function write(request, url, env) {
   const u = await who(request, env);
   if (!u) return json({ error: "sign in first" }, 401);
