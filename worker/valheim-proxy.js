@@ -30,6 +30,7 @@ const ROUTES = {
   "/structures": { ttl: 30, image: true, versioned: true, vttl: 3600 },
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
+  "/features": { ttl: 60, versioned: true, vttl: 3600 },       // the world's geography and its names; changes when someone names a place
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a
@@ -43,9 +44,34 @@ const ROUTES = {
 function cors() {
   const h = new Headers();
   h.set("Access-Control-Allow-Origin", "*");
-  h.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  h.set("Access-Control-Allow-Headers", "authorization");
+  h.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  h.set("Access-Control-Allow-Headers", "authorization, content-type");
   return h;
+}
+
+// ---------- writes ----------
+// The few things a signed-in member may change. Each is forwarded to the mod with
+// the shared write token (WRITE_TOKEN, the mod's announce token) and who did it,
+// so the mod never sees Discord and the token never reaches a browser.
+const WRITES = new Set(["/names"]);
+async function write(request, url, env) {
+  const u = await who(request, env);
+  if (!u) return json({ error: "sign in first" }, 401);
+  if (!env.WRITE_TOKEN) return json({ error: "writes are not configured" }, 503);
+  let upstream;
+  try {
+    upstream = await fetch(UPSTREAM + url.pathname, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-announce-token": env.WRITE_TOKEN,
+                 "x-user": encodeURIComponent(u.name || ""), "x-user-id": u.id || "" },
+      body: await request.text(),
+    });
+  } catch (e) {
+    return json({ error: "upstream unreachable" }, 502);
+  }
+  const body = await upstream.text();
+  return new Response(body, { status: upstream.status,
+    headers: { ...Object.fromEntries(cors()), "content-type": "application/json", "cache-control": "no-store" } });
 }
 
 // ---------- who you are ----------
@@ -130,7 +156,8 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
-    if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+    if (request.method === "POST" && WRITES.has(url.pathname)) return write(request, url, env);
+    if (request.method !== "GET") return new Response("method not allowed", { status: 405, headers: cors() });
 
     if (url.pathname === "/auth" || url.pathname.startsWith("/auth/")) return auth(request, url, env);
 
