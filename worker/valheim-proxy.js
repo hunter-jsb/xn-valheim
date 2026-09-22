@@ -31,6 +31,7 @@ const ROUTES = {
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
   "/features": { ttl: 60, versioned: true, vttl: 3600 },       // the world's geography and its names; changes when someone names a place
+  "/at":       { ttl: 30, query: true },                        // what is at a spot (?x=&z=), for a click on the map
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a
@@ -182,7 +183,7 @@ export default {
       // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat TTL
       // caches errors too, and one fetch during a restart then poisons that edge
       // for the whole TTL -- which reads as "the map is broken for one player".
-      upstream = await fetch(UPSTREAM + (route.upstream || url.pathname) + (route.versioned ? url.search : ""), {
+      upstream = await fetch(UPSTREAM + (route.upstream || url.pathname) + (route.versioned || route.query ? url.search : ""), {
         method: "GET",
         cf: ttl
           ? { cacheEverything: true,
