@@ -44,7 +44,86 @@ function cors() {
   const h = new Headers();
   h.set("Access-Control-Allow-Origin", "*");
   h.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+  h.set("Access-Control-Allow-Headers", "authorization");
   return h;
+}
+
+// ---------- who you are ----------
+// Discord's OAuth2 code flow, with membership of our guild as the gate. The
+// session is a signed token the page keeps and sends as a bearer: the site and
+// this Worker are different origins, and a cross-site cookie is what Safari and
+// Firefox now drop. Nothing is stored here; the signature is the whole state.
+// Secrets: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, SESSION_SECRET.
+const DISCORD = "https://discord.com/api/v10";
+const SESSION_DAYS = 30;
+const enc = s => new TextEncoder().encode(s);
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+const hmac = env => crypto.subtle.importKey("raw", enc(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+async function sign(env, obj) {
+  const body = b64u(enc(JSON.stringify(obj)));
+  return body + "." + b64u(await crypto.subtle.sign("HMAC", await hmac(env), enc(body)));
+}
+// the object a token carries, or null when it is missing, forged or expired
+async function open(env, token) {
+  const i = (token || "").lastIndexOf(".");
+  if (i < 0) return null;
+  try {
+    const body = token.slice(0, i);
+    if (!await crypto.subtle.verify("HMAC", await hmac(env), unb64u(token.slice(i + 1)), enc(body))) return null;
+    const obj = JSON.parse(new TextDecoder().decode(unb64u(body)));
+    return obj.exp > Date.now() / 1000 ? obj : null;
+  } catch (e) { return null; }
+}
+async function who(request, env) {
+  const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") || "");
+  return m ? open(env, m[1]) : null;
+}
+const json = (obj, status = 200) => new Response(JSON.stringify(obj),
+  { status, headers: { ...Object.fromEntries(cors()), "content-type": "application/json", "cache-control": "no-store" } });
+const page = (text, status) => new Response(`<!doctype html><meta charset="utf-8"><title>Sign in</title>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0f0e;color:#e7e2d4;font:16px/1.5 -apple-system,Segoe UI,Roboto,sans-serif">
+<p style="max-width:28rem;padding:1rem">${text} <a href="${[...ALLOWED_ORIGINS][0]}" style="color:#c9a15a">Back to the map</a></p>`,
+  { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+
+async function auth(request, url, env) {
+  if (!env.DISCORD_CLIENT_ID || !env.SESSION_SECRET) return json({ error: "sign-in is not configured" }, 404);
+  const back = url.origin + "/auth";              // the one redirect registered on the Discord app
+  if (url.pathname === "/auth/login") {
+    // the page to return to must be one of ours: the token rides back in its hash
+    const to = url.searchParams.get("to") || "";
+    let origin = null; try { origin = new URL(to).origin; } catch (e) {}
+    if (!origin || !ALLOWED_ORIGINS.has(origin)) return json({ error: "bad return address" }, 400);
+    const state = await sign(env, { to, exp: Date.now() / 1000 + 600 });
+    const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, response_type: "code", redirect_uri: back,
+      scope: "identify guilds.members.read", state, prompt: "none" });
+    return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
+  }
+  if (url.pathname === "/auth") {                 // Discord sends the person back here
+    const state = await open(env, url.searchParams.get("state"));
+    const code = url.searchParams.get("code");
+    if (!state || !code) return page("That sign-in link has expired.", 400);
+    const tok = await (await fetch(DISCORD + "/oauth2/token", { method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, client_secret: env.DISCORD_CLIENT_SECRET,
+        grant_type: "authorization_code", code, redirect_uri: back }) })).json();
+    if (!tok.access_token) return page("Discord did not accept that sign-in. Try again.", 400);
+    const bearer = { headers: { authorization: "Bearer " + tok.access_token } };
+    const me = await (await fetch(DISCORD + "/users/@me", bearer)).json();
+    // the member record doubles as the gate: a person outside the guild has none
+    const member = await (await fetch(`${DISCORD}/users/@me/guilds/${env.DISCORD_GUILD_ID}/member`, bearer)).json();
+    if (!me.id || !member.user) return page("You need to be in the server's Discord to sign in.", 403);
+    const session = await sign(env, { id: me.id, name: member.nick || me.global_name || me.username,
+      avatar: me.avatar || null, roles: member.roles || [], exp: Date.now() / 1000 + SESSION_DAYS * 86400 });
+    const dest = new URL(state.to);
+    dest.hash = (dest.hash ? dest.hash.slice(1) + "&" : "") + "session=" + session;
+    return Response.redirect(dest.toString(), 302);
+  }
+  if (url.pathname === "/auth/me") {
+    const u = await who(request, env);
+    return json(u ? { id: u.id, name: u.name, avatar: u.avatar, exp: u.exp } : {}, u ? 200 : 401);
+  }
+  return json({ error: "not found" }, 404);
 }
 
 export default {
@@ -52,6 +131,8 @@ export default {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
     if (request.method !== "GET") return new Response("method not allowed", { status: 405 });
+
+    if (url.pathname === "/auth" || url.pathname.startsWith("/auth/")) return auth(request, url, env);
 
     if (url.pathname === "/" || url.pathname === "/health") {
       return new Response(JSON.stringify({ ok: true, upstream: UPSTREAM, routes: Object.keys(ROUTES) }),
