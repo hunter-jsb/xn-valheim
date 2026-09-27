@@ -64,8 +64,8 @@ function cors() {
 // The few things a signed-in member may change. Each is forwarded to the mod with
 // the shared write token (WRITE_TOKEN, the mod's announce token) and who did it,
 // so the mod never sees Discord and the token never reaches a browser.
-const WRITES = new Set(["/names", "/pins", "/settings"]);   // naming a place; a pin; a setting (admins)
-const ADMIN = new Set(["/settings"]);                            // what only the Discord admin role may touch
+const WRITES = new Set(["/names", "/pins", "/settings", "/discord/guilds", "/discord/channels"]);   // naming a place; a pin; a setting; the settings picker (admins)
+const ADMIN = new Set(["/settings", "/discord/guilds", "/discord/channels"]);                            // what only the Discord admin role may touch
 // An admin is the guild's owner, a member with a role that carries Discord's own
 // administrator permission, or one with the role DISCORD_ADMIN_ROLE names. The
 // guild is read once in a while; for anything that matters the member is read
@@ -97,16 +97,10 @@ async function admin(u, env, live) {
   }
   return u.id === g.owner || roles.some(r => g.admins.has(r)) || (!!env.DISCORD_ADMIN_ROLE && roles.includes(env.DISCORD_ADMIN_ROLE));
 }
-// What people do on the site, one line each, to the guild's channel
-function tell(env, ctx, line) {
-  if (!line || !env.DISCORD_BOT_TOKEN || !env.DISCORD_LOG_CHANNEL) return;
-  ctx.waitUntil(fetch(`${DISCORD}/channels/${env.DISCORD_LOG_CHANNEL}/messages`, {
-    method: "POST",
-    headers: { authorization: "Bot " + env.DISCORD_BOT_TOKEN, "content-type": "application/json" },
-    body: JSON.stringify({ content: line.slice(0, 1900), allowed_mentions: { parse: [] } }),
-  }).catch(() => {}));
-}
-async function write(request, url, env, ctx) {
+// The mod itself posts what happened to the log channel now (Discord.Tell); this
+// just forwards the write and the admin check. The mod's answer still carries a
+// "log" field for a caller that wants it -- harmless, just unused here.
+async function write(request, url, env) {
   const u = await who(request, env);
   if (!u) return json({ error: "sign in first" }, 401);
   if (!env.WRITE_TOKEN) return json({ error: "writes are not configured" }, 503);
@@ -124,10 +118,6 @@ async function write(request, url, env, ctx) {
     return json({ error: "upstream unreachable" }, 502);
   }
   const body = await upstream.text();
-  if (request.method === "POST" && upstream.ok) {
-    let line = null; try { line = JSON.parse(body).log; } catch (e) {}
-    tell(env, ctx, line);
-  }
   return new Response(body, { status: upstream.status,
     headers: { ...Object.fromEntries(cors()), "content-type": "application/json", "cache-control": "no-store" } });
 }
@@ -214,7 +204,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
-    if (WRITES.has(url.pathname) && (request.method === "POST" || ADMIN.has(url.pathname))) return write(request, url, env, ctx);
+    if (WRITES.has(url.pathname) && (request.method === "POST" || ADMIN.has(url.pathname))) return write(request, url, env);
     if (request.method !== "GET") return new Response("method not allowed", { status: 405, headers: cors() });
 
     if (url.pathname === "/auth" || url.pathname.startsWith("/auth/")) return auth(request, url, env);
