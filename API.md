@@ -52,9 +52,16 @@ there is no apply-without-restart path.
 > Poll that manifest's `buildid` against Steam's published build instead; the panel
 > restarts the server itself when it finishes.
 
-> `saveconfig` field names are Alpine-bound and not in static HTML; capture them
-> from one real "Save Config" request in browser devtools before automating writes.
-> The safer config surface is the on-disk files below.
+> `saveconfig` fields (captured 2026-09-27 from the dashboard's own form, which is plain
+> HTML on `GET /`, the `<form>` around `id="Crossplay"`): hidden `guid`, `serverLinuxUsername`,
+> `serverId`; text `serverName`, `serverPassword`, `gameWorld`; toggles as hidden inputs
+> `Crossplay`, `noMap`, `playerEvents`, `passiveMobs`, `noBuildCost`, `fireHazards` with the
+> strings `true`/`false`; selects `serverPreset` (`Normal`...), `modifierCombat`,
+> `modifierDeath`, `modifierResources`, `modifierRaids`, `modifierPortals` (empty = preset's
+> own). Post the whole set, form-encoded, with only the field you mean to change changed;
+> the panel answers `{"success":true,"query":"success-save-restart",...}` and restarts the
+> server itself. Parse the form fresh each time: `guid` changes per page load. The toggle
+> inputs are written `value=true` unquoted, so an attribute parser must accept bare values.
 
 ## Files (SFTP-over-HTTP)
 
