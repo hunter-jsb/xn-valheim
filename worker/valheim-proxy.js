@@ -54,23 +54,70 @@ function cors() {
 // The few things a signed-in member may change. Each is forwarded to the mod with
 // the shared write token (WRITE_TOKEN, the mod's announce token) and who did it,
 // so the mod never sees Discord and the token never reaches a browser.
-const WRITES = new Set(["/names", "/pins"]);   // naming a place; placing, changing or taking up a pin
-async function write(request, url, env) {
+const WRITES = new Set(["/names", "/pins", "/settings"]);   // naming a place; a pin; a setting (admins)
+const ADMIN = new Set(["/settings"]);                            // what only the Discord admin role may touch
+// An admin is the guild's owner, a member with a role that carries Discord's own
+// administrator permission, or one with the role DISCORD_ADMIN_ROLE names. The
+// guild is read once in a while; for anything that matters the member is read
+// again, so a role taken away bites at once.
+let guild = { at: 0, owner: null, admins: new Set() };
+async function guildInfo(env) {
+  if (Date.now() - guild.at < 300000 || !env.DISCORD_BOT_TOKEN) return guild;
+  try {
+    const h = { headers: { authorization: "Bot " + env.DISCORD_BOT_TOKEN } };
+    const g = await (await fetch(`${DISCORD}/guilds/${env.DISCORD_GUILD_ID}`, h)).json();
+    const roles = await (await fetch(`${DISCORD}/guilds/${env.DISCORD_GUILD_ID}/roles`, h)).json();
+    const admins = new Set((Array.isArray(roles) ? roles : []).filter(r => (BigInt(r.permissions || "0") & 8n) !== 0n || r.id === env.DISCORD_ADMIN_ROLE).map(r => r.id));
+    if (env.DISCORD_ADMIN_ROLE) admins.add(env.DISCORD_ADMIN_ROLE);
+    guild = { at: Date.now(), owner: g.owner_id || null, admins };
+  } catch (e) {}
+  return guild;
+}
+async function admin(u, env, live) {
+  if (!u) return false;
+  const g = await guildInfo(env);
+  let roles = u.roles || [];
+  if (live && env.DISCORD_BOT_TOKEN) {
+    try {
+      const m = await (await fetch(`${DISCORD}/guilds/${env.DISCORD_GUILD_ID}/members/${u.id}`,
+        { headers: { authorization: "Bot " + env.DISCORD_BOT_TOKEN } })).json();
+      if (!m.user) return false;                        // no longer in the guild
+      roles = m.roles || [];
+    } catch (e) { return false; }
+  }
+  return u.id === g.owner || roles.some(r => g.admins.has(r)) || (!!env.DISCORD_ADMIN_ROLE && roles.includes(env.DISCORD_ADMIN_ROLE));
+}
+// What people do on the site, one line each, to the guild's channel
+function tell(env, ctx, line) {
+  if (!line || !env.DISCORD_BOT_TOKEN || !env.DISCORD_LOG_CHANNEL) return;
+  ctx.waitUntil(fetch(`${DISCORD}/channels/${env.DISCORD_LOG_CHANNEL}/messages`, {
+    method: "POST",
+    headers: { authorization: "Bot " + env.DISCORD_BOT_TOKEN, "content-type": "application/json" },
+    body: JSON.stringify({ content: line.slice(0, 1900), allowed_mentions: { parse: [] } }),
+  }).catch(() => {}));
+}
+async function write(request, url, env, ctx) {
   const u = await who(request, env);
   if (!u) return json({ error: "sign in first" }, 401);
   if (!env.WRITE_TOKEN) return json({ error: "writes are not configured" }, 503);
+  const needsAdmin = ADMIN.has(url.pathname);
+  if (needsAdmin && !await admin(u, env, true)) return json({ error: "admins only" }, 403);
   let upstream;
   try {
-    upstream = await fetch(UPSTREAM + url.pathname, {
-      method: "POST",
+    upstream = await fetch(UPSTREAM + url.pathname + (request.method === "GET" ? url.search : ""), {
+      method: request.method,
       headers: { "content-type": "application/json", "x-announce-token": env.WRITE_TOKEN,
-                 "x-user": encodeURIComponent(u.name || ""), "x-user-id": u.id || "" },
-      body: await request.text(),
+                 "x-user": encodeURIComponent(u.name || ""), "x-user-id": u.id || "", ...(needsAdmin ? { "x-admin": "1" } : {}) },
+      body: request.method === "POST" ? await request.text() : undefined,
     });
   } catch (e) {
     return json({ error: "upstream unreachable" }, 502);
   }
   const body = await upstream.text();
+  if (request.method === "POST" && upstream.ok) {
+    let line = null; try { line = JSON.parse(body).log; } catch (e) {}
+    tell(env, ctx, line);
+  }
   return new Response(body, { status: upstream.status,
     headers: { ...Object.fromEntries(cors()), "content-type": "application/json", "cache-control": "no-store" } });
 }
@@ -148,7 +195,7 @@ async function auth(request, url, env) {
   }
   if (url.pathname === "/auth/me") {
     const u = await who(request, env);
-    return json(u ? { id: u.id, name: u.name, avatar: u.avatar, exp: u.exp } : {}, u ? 200 : 401);
+    return json(u ? { id: u.id, name: u.name, avatar: u.avatar, exp: u.exp, admin: await admin(u, env, false) } : {}, u ? 200 : 401);
   }
   return json({ error: "not found" }, 404);
 }
@@ -157,7 +204,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
-    if (request.method === "POST" && WRITES.has(url.pathname)) return write(request, url, env);
+    if (WRITES.has(url.pathname) && (request.method === "POST" || ADMIN.has(url.pathname))) return write(request, url, env, ctx);
     if (request.method !== "GET") return new Response("method not allowed", { status: 405, headers: cors() });
 
     if (url.pathname === "/auth" || url.pathname.startsWith("/auth/")) return auth(request, url, env);
