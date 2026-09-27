@@ -31,6 +31,7 @@ const ROUTES = {
   "/stats/players": { ttl: 30 },   // per-player tallies; changes slowly
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
   "/features": { ttl: 60, versioned: true, vttl: 3600 },       // the world's geography and its names; changes when someone names a place
+  "/locations": { ttl: 60 },                                   // the world's explored locations, for the tour; rebuilt each sweep
   "/at":       { ttl: 30, query: true },                        // what is at a spot (?x=&z=), for a click on the map
   // The 3D view: a 256 m chunk's ground and objects by ?cx=&cz=, the model library's
   // index. The page names rev.height / rev.objects / rev.models from /state as ?v=, so a
