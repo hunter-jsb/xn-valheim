@@ -33,7 +33,7 @@ jobs:
           set -euo pipefail
           SRC="https://raw.githubusercontent.com/hunter-jsb/valheim-webmap/${REF}/WebMap/web"
           mkdir -p out
-          for f in index.html portals.html plan.html players.html map-core.js site.css; do
+          for f in index.html portals.html plan.html players.html settings.html map-core.js site.css; do
             curl -sfL -o "out/$f" "$SRC/$f"
           done
           cp site/site-config.js out/site-config.js
