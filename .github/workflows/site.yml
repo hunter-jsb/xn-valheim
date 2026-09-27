@@ -31,11 +31,13 @@ jobs:
           REF: ${{ github.event.inputs.ref || 'main' }}
         run: |
           set -euo pipefail
-          SRC="https://raw.githubusercontent.com/hunter-jsb/valheim-webmap/${REF}/WebMap/web"
-          mkdir -p out
-          for f in index.html portals.html plan.html players.html settings.html map-core.js site.css; do
-            curl -sfL -o "out/$f" "$SRC/$f"
-          done
+          # the whole WebMap/web folder at the ref, subfolders and all (the 3D view's js/
+          # and its vendored three.js), so a new file in the viewer needs no edit here
+          mkdir -p out src
+          curl -sfL "https://codeload.github.com/hunter-jsb/valheim-webmap/tar.gz/${REF}" \
+            | tar -xz -C src --wildcards '*/WebMap/web/*'
+          cp -r src/*/WebMap/web/. out/
+          test -f out/index.html
           cp site/site-config.js out/site-config.js
           # crawler-facing text is ours here; the viewer's own is generic
           sed -i 's|<title>Valheim WebMap</title>|<title>Xandaris Valheim</title>|; s|content="Valheim WebMap"|content="Xandaris Valheim"|g' out/*.html

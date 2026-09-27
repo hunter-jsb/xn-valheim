@@ -182,14 +182,32 @@ def _put(sf, src: Path, dst: str):
     print(f"{dst}  {src.stat().st_size} b")
 
 
+def _mkdirs(sf, path: str, made: set):
+    """Every missing folder down to path: SFTP makes them one at a time."""
+    parts = path.split("/")
+    for i in range(1, len(parts) + 1):
+        p = "/".join(parts[:i])
+        if p in made:
+            continue
+        try:
+            sf.stat(p)
+        except FileNotFoundError:
+            sf.mkdir(p)
+        made.add(p)
+
+
 def deploy_web(src: str):
+    """The whole web/ folder, subfolders too (the 3D view's js/ and vendor/three/)."""
     d = Path(src) if src else MOD_REPO / "WebMap" / "web"
     if not (d / "index.html").is_file():
         sys.exit(f"{d}: no index.html there")
     t, sf = _sftp()
+    made: set = set()
     try:
-        for f in sorted(p for p in d.iterdir() if p.is_file()):
-            _put(sf, f, f"{PLUGIN_DIR}/web/{f.name}")
+        for f in sorted(p for p in d.rglob("*") if p.is_file()):
+            dst = f"{PLUGIN_DIR}/web/{f.relative_to(d).as_posix()}"
+            _mkdirs(sf, dst.rsplit("/", 1)[0], made)
+            _put(sf, f, dst)
     finally:
         t.close()
 

@@ -32,12 +32,22 @@ const ROUTES = {
   "/pieces":  { ttl: 30, versioned: true, vttl: 3600 },        // every placed piece as a footprint; changes only as people build
   "/features": { ttl: 60, versioned: true, vttl: 3600 },       // the world's geography and its names; changes when someone names a place
   "/at":       { ttl: 30, query: true },                        // what is at a spot (?x=&z=), for a click on the map
+  // The 3D view: a 256 m chunk's ground and objects by ?cx=&cz=, the model library's
+  // index. The page names rev.height / rev.objects / rev.models from /state as ?v=, so a
+  // chunk can sit on the edge for an hour; an unwalked chunk's 404 is never kept.
+  "/height":   { ttl: 30, query: true, versioned: true, vttl: 3600 },
+  "/objects":  { ttl: 30, query: true, versioned: true, vttl: 3600 },
+  "/prefabs":  { ttl: 30, versioned: true, vttl: 3600 },
   // The unfogged world render. Deliberately not at /map: the honour system is
   // the actual policy, this just avoids leaving a one-click URL lying around.
   // versioned: the page's ?v= is forwarded, so it is part of the edge cache key and a
   // new render is reachable the moment the page bumps it -- no route renaming, no purge
   "/base-6f3a9c2e": { ttl: 86400, upstream: "/map.jpg", noNavigate: true, image: true, versioned: true },
 };
+// The model library's files, /models/<hash>.glb and /models/tex_<name>.png: generic game
+// models, the same for every world, and named by content (a model's ?v= is its hash).
+// The mod itself refuses any name that is not one of those two shapes.
+const MODELS = { ttl: 86400, versioned: true, vttl: 86400 };
 
 // Wildcard rather than echoing Origin: these responses are edge-cached, and a
 // cached per-origin header would be served to the wrong origin. The data is
@@ -214,7 +224,7 @@ export default {
         { headers: { ...Object.fromEntries(cors()), "content-type": "application/json" } });
     }
 
-    const route = ROUTES[url.pathname];
+    const route = ROUTES[url.pathname] || (url.pathname.startsWith("/models/") ? MODELS : null);
     if (!route) return new Response("not found", { status: 404, headers: cors() });
 
     // Pasting this into an address bar is a document request; the page's <img>
@@ -224,7 +234,8 @@ export default {
     }
 
 
-    const ttl = route.versioned && url.search && route.vttl ? route.vttl : route.ttl;
+    // a named revision, not merely a query: /height's ?cx=&cz= alone must not sit for an hour
+    const ttl = route.versioned && url.searchParams.has("v") && route.vttl ? route.vttl : route.ttl;
     let upstream;
     try {
       // cacheTtlByStatus, never a blanket cacheTtl: with cacheEverything a flat TTL
