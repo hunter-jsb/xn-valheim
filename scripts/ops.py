@@ -216,7 +216,7 @@ def main():
     ap.add_argument("--warn", type=int, metavar="SECONDS",
                     help="restart: shout a countdown in game first")
     ap.add_argument("--reason", default="", help="restart: why, for the shout")
-    ap.add_argument("--drain", type=int, nargs="?", const=300, metavar="SECONDS",
+    ap.add_argument("--drain", type=int, nargs="?", const=60, metavar="SECONDS",
                     help="restart: ask players to log out and wait for them "
                          "(default 300s) before restarting. Prefer this to --warn "
                          "whenever anyone is online -- see drain().")
