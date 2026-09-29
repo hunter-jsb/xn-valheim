@@ -1,0 +1,53 @@
+// The sign-in for maps elsewhere, end to end with Discord played by a stub:
+//   node worker/auth.test.mjs
+import { generateKeyPairSync, verify } from "node:crypto";
+const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const key = pair.privateKey.export({ type: "pkcs8", format: "der" }).toString("base64");
+const env = { DISCORD_CLIENT_ID: "123", DISCORD_CLIENT_SECRET: "s", DISCORD_GUILD_ID: "537761321052274698", SESSION_SECRET: "test-secret", AUTH_PRIVATE_KEY: key };
+const W = (await import("./valheim-proxy.js")).default;
+const pub = pair.publicKey;
+let fails = 0; const ok = (name, cond, detail = "") => { if (!cond) fails++; console.log((cond ? "ok  " : "FAIL") + " " + name + (detail ? " -- " + detail : "")); };
+const BASE = "https://valheim-proxy.hunterjsb.workers.dev", MAP = "http://104.224.55.78:3000", GID = "111111111111111111";
+const call = (path, headers = {}) => W.fetch(new Request(BASE + path, { headers, redirect: "manual" }), env, {});
+// Discord, as the Worker will see it
+let member = true;
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (u, init) => {
+  const url = String(u);
+  const J = o => new Response(JSON.stringify(o), { headers: { "content-type": "application/json" } });
+  if (url.endsWith("/oauth2/token")) return J({ access_token: "user-token" });
+  if (url.endsWith("/users/@me")) return J({ id: "42", username: "gonk", global_name: "Gonk", avatar: "abc" });
+  if (url.includes(`/users/@me/guilds/${GID}/member`)) return J(member ? { user: { id: "42" }, nick: "Gonk the Bold", roles: ["900"] } : { message: "Unknown Guild", code: 10004 });
+  if (url.includes("/users/@me/guilds?")) return J([{ id: "5", owner: false, permissions: "0" }, { id: GID, owner: true, permissions: "2251799813685247" }]);
+  return realFetch(u, init);
+};
+const q = (to, gid, aud) => "/auth/login?" + new URLSearchParams({ to, guild: gid, aud });
+let r = await call(q(MAP + "/world.html", GID, MAP));
+const html = await r.text(), setc = r.headers.get("set-cookie") || "";
+ok("a map elsewhere gets the page that names it", r.status === 200 && html.includes("104.224.55.78:3000") && /xnv_n=/.test(setc) && /HttpOnly/.test(setc) && r.headers.get("x-frame-options") === "DENY");
+const state = decodeURIComponent(/\/auth\/go\?state=([^"]+)"/.exec(html)[1]), ck = /xnv_n=[^;]+/.exec(setc)[0];
+ok("an aud that is not the return address is refused", (await call(q(MAP + "/", GID, "http://evil.example"))).status === 400);
+ok("a guild that is no id is refused", (await call(q(MAP + "/", "abc", MAP))).status === 400);
+ok("a return address that is no web page is refused", (await call(q("javascript:alert(1)", GID, "null"))).status === 400);
+ok("the click without the page's cookie goes nowhere", (await call("/auth/go?state=" + encodeURIComponent(state))).status === 400);
+r = await call("/auth/go?state=" + encodeURIComponent(state), { cookie: ck });
+const loc = new URL(r.headers.get("location") || "http://x/");
+ok("the click goes to Discord with our one redirect", r.status === 302 && loc.hostname === "discord.com" && loc.searchParams.get("redirect_uri") === BASE + "/auth" && loc.searchParams.get("scope") === "identify guilds guilds.members.read");
+ok("Discord's answer without the cookie is refused", (await call("/auth?code=abc&state=" + encodeURIComponent(state))).status === 400);
+r = await call("/auth?code=abc&state=" + encodeURIComponent(state), { cookie: ck });
+const dest = new URL(r.headers.get("location") || "http://x/"), tok = (/session=(.+)$/.exec(dest.hash) || [])[1] || "";
+const [body, sig] = tok.split(".");
+const claims = body ? JSON.parse(Buffer.from(body, "base64url").toString()) : {};
+ok("a member lands back on the map they came from", r.status === 302 && dest.origin === MAP && dest.pathname === "/world.html");
+ok("the session verifies under the public key", !!sig && verify("RSA-SHA256", Buffer.from(body), pub, Buffer.from(sig, "base64url")));
+ok("it says who, where and until when", claims.id === "42" && claims.name === "Gonk the Bold" && claims.guild === GID && claims.aud === MAP && claims.owner === true && claims.perms === "2251799813685247" && Number.isInteger(claims.exp) && claims.exp > Date.now() / 1000 + 29 * 86400, JSON.stringify(Object.keys(claims)));
+ok("an altered session does not verify", !verify("RSA-SHA256", Buffer.from(body.slice(0, -2) + "AA"), pub, Buffer.from(sig, "base64url")));
+member = false;
+r = await call("/auth?code=abc&state=" + encodeURIComponent(state), { cookie: ck });
+ok("someone outside the guild gets no session", r.status === 403 && !(r.headers.get("location") || "").includes("session="));
+r = await call("/auth/login?to=" + encodeURIComponent("https://hunter-jsb.github.io/xn-valheim/"));
+const l2 = new URL(r.headers.get("location") || "http://x/");
+ok("the hosted site's own sign-in is as it was", r.status === 302 && l2.searchParams.get("scope") === "identify guilds.members.read" && l2.searchParams.get("prompt") === "none");
+ok("a stranger's address without a guild is still refused", (await call("/auth/login?to=" + encodeURIComponent(MAP + "/"))).status === 400);
+console.log(fails ? `${fails} FAILED` : "all passed");
+process.exit(fails ? 1 : 0);

@@ -34,6 +34,15 @@ uv run --project scripts scripts/collect.py --game Valheim   # refresh the page 
 cd pulumi && pulumi preview       # diff role/ban/allow lists vs. the live server
 ```
 
+## Sign-in
+
+The Worker signs people in with Discord, for the hosted site and for any map the mod serves
+on its own address. A map elsewhere sends the person with the guild that gates it; they are
+shown where the session is going, go through Discord, and come back to that map with a
+session signed by `AUTH_PRIVATE_KEY`, which the mod checks against `worker/auth-public.pem`.
+One Discord application and one redirect (`/auth` here) serve every map; an operator sets
+`discord_guild` in the mod and nothing else. `node worker/auth.test.mjs` plays it through.
+
 ## Upstream
 
 IB open-sources the Docker images the servers run on, including
