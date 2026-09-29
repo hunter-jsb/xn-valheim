@@ -40,7 +40,7 @@ const [body, sig] = tok.split(".");
 const claims = body ? JSON.parse(Buffer.from(body, "base64url").toString()) : {};
 ok("a member lands back on the map they came from", r.status === 302 && dest.origin === MAP && dest.pathname === "/world.html");
 ok("the session verifies under the public key", !!sig && verify("RSA-SHA256", Buffer.from(body), pub, Buffer.from(sig, "base64url")));
-ok("it says who, where and until when", claims.id === "42" && claims.name === "Gonk the Bold" && claims.guild === GID && claims.aud === MAP && claims.owner === true && claims.perms === "2251799813685247" && Number.isInteger(claims.exp) && claims.exp > Date.now() / 1000 + 29 * 86400, JSON.stringify(Object.keys(claims)));
+ok("it says who, where and until when", claims.id === "42" && claims.name === "Gonk the Bold" && claims.guild === GID && claims.aud === MAP && claims.owner === true && claims.perms === "2251799813685247" && Number.isInteger(claims.exp) && claims.exp > Date.now() / 1000 + 6 * 86400 && claims.exp < Date.now() / 1000 + 8 * 86400 && Number.isInteger(claims.iat), JSON.stringify(Object.keys(claims)));
 ok("an altered session does not verify", !verify("RSA-SHA256", Buffer.from(body.slice(0, -2) + "AA"), pub, Buffer.from(sig, "base64url")));
 member = false;
 r = await call("/auth?code=abc&state=" + encodeURIComponent(state), { cookie: ck });
@@ -48,6 +48,8 @@ ok("someone outside the guild gets no session", r.status === 403 && !(r.headers.
 r = await call("/auth/login?to=" + encodeURIComponent("https://hunter-jsb.github.io/xn-valheim/"));
 const l2 = new URL(r.headers.get("location") || "http://x/");
 ok("the hosted site's own sign-in is as it was", r.status === 302 && l2.searchParams.get("scope") === "identify guilds.members.read" && l2.searchParams.get("prompt") === "none");
+const st = new URL(r.headers.get("location")).searchParams.get("state");
+ok("a sign-in's state is no session", (await call("/auth/me", { authorization: "Bearer " + st })).status === 401 && (await call("/auth/me", { authorization: "Bearer " + state })).status === 401);
 ok("a stranger's address without a guild is still refused", (await call("/auth/login?to=" + encodeURIComponent(MAP + "/"))).status === 400);
 console.log(fails ? `${fails} FAILED` : "all passed");
 process.exit(fails ? 1 : 0);

@@ -131,22 +131,24 @@ async function write(request, url, env) {
 // Secrets: DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_GUILD_ID, SESSION_SECRET,
 // and AUTH_PRIVATE_KEY (PKCS8, base64) for the maps that sign in from elsewhere.
 const DISCORD = "https://discord.com/api/v10";
-const SESSION_DAYS = 30;
+const SESSION_DAYS = 30, ELSEWHERE_DAYS = 7;   // a map elsewhere cannot ask us whether someone is still an admin, so its sessions are short
 const enc = s => new TextEncoder().encode(s);
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
-const hmac = env => crypto.subtle.importKey("raw", enc(env.SESSION_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
-async function sign(env, obj) {
+// A sign-in's state and a session are signed under different keys: a state is
+// handed to anyone who asks for the login page, and must never pass for a session.
+const hmac = (env, kind) => crypto.subtle.importKey("raw", enc(env.SESSION_SECRET + (kind ? "\n" + kind : "")), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+async function sign(env, obj, kind) {
   const body = b64u(enc(JSON.stringify(obj)));
-  return body + "." + b64u(await crypto.subtle.sign("HMAC", await hmac(env), enc(body)));
+  return body + "." + b64u(await crypto.subtle.sign("HMAC", await hmac(env, kind), enc(body)));
 }
 // the object a token carries, or null when it is missing, forged or expired
-async function open(env, token) {
+async function open(env, token, kind) {
   const i = (token || "").lastIndexOf(".");
   if (i < 0) return null;
   try {
     const body = token.slice(0, i);
-    if (!await crypto.subtle.verify("HMAC", await hmac(env), unb64u(token.slice(i + 1)), enc(body))) return null;
+    if (!await crypto.subtle.verify("HMAC", await hmac(env, kind), unb64u(token.slice(i + 1)), enc(body))) return null;
     const obj = JSON.parse(new TextDecoder().decode(unb64u(body)));
     return obj.exp > Date.now() / 1000 ? obj : null;
   } catch (e) { return null; }
@@ -165,7 +167,8 @@ const cookie = (request, name) => (new RegExp("(?:^|;\\s*)" + name + "=([^;]+)")
 const escHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 async function who(request, env) {
   const m = /^Bearer\s+(\S+)$/i.exec(request.headers.get("authorization") || "");
-  return m ? open(env, m[1]) : null;
+  const u = m ? await open(env, m[1]) : null;
+  return u && typeof u.id === "string" && u.id ? u : null;      // a session names someone
 }
 const json = (obj, status = 200) => new Response(JSON.stringify(obj),
   { status, headers: { ...Object.fromEntries(cors()), "content-type": "application/json", "cache-control": "no-store" } });
@@ -187,7 +190,7 @@ async function elsewhere(url, env, to, origin, gid) {
   if (!env.AUTH_PRIVATE_KEY) return json({ error: "sign-in for other maps is not configured" }, 404);
   if (!origin || url.searchParams.get("aud") !== origin || !/^\d{15,22}$/.test(gid)) return json({ error: "bad return address" }, 400);
   const n = b64u(crypto.getRandomValues(new Uint8Array(18)));
-  const state = await sign(env, { to, gid, aud: origin, n, exp: Date.now() / 1000 + 600 });
+  const state = await sign(env, { to, gid, aud: origin, n, exp: Date.now() / 1000 + 600 }, "state");
   const btn = "display:inline-block;padding:.55rem 1.1rem;border-radius:8px;text-decoration:none;font-weight:600";
   return new Response(`${SHELL}
 <div style="max-width:30rem;padding:1.2rem">
@@ -220,22 +223,22 @@ async function auth(request, url, env) {
     let origin = null; try { const t = new URL(to); if (t.protocol === "https:" || t.protocol === "http:") origin = t.origin; } catch (e) {}
     if (gid !== null) return elsewhere(url, env, to, origin, gid);
     if (!origin || !ALLOWED_ORIGINS.has(origin)) return json({ error: "bad return address" }, 400);
-    const state = await sign(env, { to, exp: Date.now() / 1000 + 600 });
+    const state = await sign(env, { to, exp: Date.now() / 1000 + 600 }, "state");
     const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, response_type: "code", redirect_uri: back,
       scope: "identify guilds.members.read", state, prompt: "none" });
     return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
   }
   if (url.pathname === "/auth/go") {              // the click on the page elsewhere() showed
-    const raw = url.searchParams.get("state"), state = await open(env, raw);
-    if (!state || !state.gid || cookie(request, "xnv_n") !== state.n) return page("That sign-in link has expired.", 400, state && state.aud);
+    const raw = url.searchParams.get("state"), state = await open(env, raw, "state");
+    if (!state || !state.to || !state.gid || cookie(request, "xnv_n") !== state.n) return page("That sign-in link has expired.", 400, state && state.aud);
     const q = new URLSearchParams({ client_id: env.DISCORD_CLIENT_ID, response_type: "code", redirect_uri: back,
       scope: "identify guilds guilds.members.read", state: raw, prompt: "none" });
     return Response.redirect("https://discord.com/oauth2/authorize?" + q, 302);
   }
   if (url.pathname === "/auth") {                 // Discord sends the person back here
-    const state = await open(env, url.searchParams.get("state"));
+    const state = await open(env, url.searchParams.get("state"), "state");
     const code = url.searchParams.get("code");
-    if (!state || !code) return page("That sign-in link has expired.", 400, state && state.aud);
+    if (!state || !state.to || !code) return page("That sign-in link has expired.", 400, state && state.aud);
     if (state.gid && cookie(request, "xnv_n") !== state.n) return page("That sign-in link has expired.", 400, state.aud);
     const tok = await (await fetch(DISCORD + "/oauth2/token", { method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -252,7 +255,7 @@ async function auth(request, url, env) {
     if (state.gid) {                              // a map elsewhere: it decides who is an admin, from what Discord says of them
       const g = await guildOf(bearer, state.gid);
       session = await signFor(env, { ...mine, owner: !!(g && g.owner), perms: String((g && g.permissions) || "0"),
-        guild: state.gid, aud: state.aud, exp: Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400 });
+        guild: state.gid, aud: state.aud, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + ELSEWHERE_DAYS * 86400 });
     } else session = await sign(env, { ...mine, exp: Date.now() / 1000 + SESSION_DAYS * 86400 });
     const dest = new URL(state.to);
     dest.hash = (dest.hash ? dest.hash.slice(1) + "&" : "") + "session=" + session;
