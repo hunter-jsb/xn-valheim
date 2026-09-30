@@ -324,8 +324,7 @@ export default {
 
     const headers = cors();
     const ct = upstream.headers.get("content-type");
-    // the mod misspells this one as "applicaion/json"
-    headers.set("content-type", ct && !ct.startsWith("applicaion") ? ct : "application/json");
+    headers.set("content-type", ct || "application/json");
     headers.set("cache-control", ttl ? `public, max-age=${ttl}` : "no-store");
     return new Response(upstream.body, { status: upstream.status, headers });
   },
