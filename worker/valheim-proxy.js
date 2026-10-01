@@ -65,8 +65,8 @@ function cors() {
 // The few things a signed-in member may change. Each is forwarded to the mod with
 // the shared write token (WRITE_TOKEN, the mod's announce token) and who did it,
 // so the mod never sees Discord and the token never reaches a browser.
-const WRITES = new Set(["/names", "/pins", "/settings", "/discord/guilds", "/discord/channels"]);   // naming a place; a pin; a setting; the settings picker (admins)
-const ADMIN = new Set(["/settings", "/discord/guilds", "/discord/channels"]);                            // what only the Discord admin role may touch
+const WRITES = new Set(["/names", "/pins", "/settings", "/spawns", "/discord/guilds", "/discord/channels"]);   // naming a place; a pin; a setting; the settings picker (admins)
+const ADMIN = new Set(["/settings", "/spawns", "/discord/guilds", "/discord/channels"]);                            // what only the Discord admin role may touch
 // An admin is the guild's owner, a member with a role that carries Discord's own
 // administrator permission, or one with the role DISCORD_ADMIN_ROLE names. The
 // guild is read once in a while; for anything that matters the member is read
