@@ -108,11 +108,16 @@ def announce(text: str) -> bool:
 
 def players_online() -> list[str]:
     """Names of players currently connected, straight from the mod."""
+    return running() or []
+
+
+def running() -> list[str] | None:
+    """The players connected, or None when the server does not answer at all."""
     try:
         with urllib.request.urlopen(f"{WEBMAP_URL}/players", timeout=10) as r:
             return [p.get("name", "?") for p in json.load(r).get("players", [])]
     except Exception:
-        return []
+        return None
 
 
 def drain(timeout: int, reason: str) -> None:
@@ -260,6 +265,11 @@ def main():
             sys.exit("usage: ops.py announce '<message>'")
         sys.exit(0 if announce(a.arg) else 1)
     elif a.cmd in ("start", "stop", "restart"):
+        # the panel answers a start on a running server by restarting it, with no drain
+        who = running() if a.cmd == "start" else None
+        if who is not None:
+            sys.exit(f"the server is already running ({', '.join(who) or 'nobody on'}); "
+                     "a start would restart it -- use `restart --drain` for that")
         if a.drain and a.cmd in ("restart", "stop"):
             drain(a.drain, a.reason)
         elif a.warn and a.cmd in ("restart", "stop"):
