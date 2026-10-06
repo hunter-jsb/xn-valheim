@@ -326,6 +326,13 @@ export default {
     const ct = upstream.headers.get("content-type");
     headers.set("content-type", ct || "application/json");
     headers.set("cache-control", ttl ? `public, max-age=${ttl}` : "no-store");
+    // The 3D view's chunks are opaque bytes, which the edge never compresses on its own,
+    // and the subrequest arrives already unpacked: pack them again, about a third the size.
+    if (ct === "application/octet-stream" && upstream.ok && upstream.body && /\bgzip\b/.test(request.headers.get("accept-encoding") || "")) {
+      headers.set("content-encoding", "gzip");
+      headers.set("vary", "Accept-Encoding");
+      return new Response(upstream.body.pipeThrough(new CompressionStream("gzip")), { status: upstream.status, headers, encodeBody: "manual" });
+    }
     return new Response(upstream.body, { status: upstream.status, headers });
   },
 };
