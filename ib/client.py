@@ -71,8 +71,17 @@ class IBClient:
         self._ensure()
         html = self.s.get(f"{BASE}/", timeout=self.timeout).text
         out = []
-        for m in re.finditer(r"fileBrowser\('([^']+)','([^']+)','([^']+)'\)", html):
-            out.append(Server(linux_username=m.group(1), ip=m.group(2), game=m.group(3)))
+        # fileBrowser('<user>','<game>') since 2026-10; it carried the ip as a middle
+        # argument before. The ip is also the bare address shown in the server's own block.
+        for m in re.finditer(r"fileBrowser\('([^']+)'(?:,'([^']+)')?,'([^']+)'\)", html):
+            user, ip, game = m.group(1), m.group(2), m.group(3)
+            if not ip:
+                at = html.find(f'data-server="{user}"')
+                other = re.compile(r'data-server="(?!' + re.escape(user) + r'")')   # the next server's block, not this one's again
+                nxt = other.search(html, at + 1) if at >= 0 else None
+                hit = re.search(r">(\d{1,3}(?:\.\d{1,3}){3})<", html[at:nxt.start() if nxt else None]) if at >= 0 else None
+                ip = hit.group(1) if hit else None
+            out.append(Server(linux_username=user, ip=ip, game=game))
         return out
 
     def find(self, game: str) -> Server:

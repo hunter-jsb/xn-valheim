@@ -25,7 +25,9 @@ Because the cookie lasts only ~24h, unattended automation stores
 ## Server identity
 
 Every server is keyed by a 12-char **`linuxUsername`**, not a numeric id. The
-dashboard embeds each as `fileBrowser('<linuxUsername>','<ip>','<game>')`. This
+dashboard embeds each as `fileBrowser('<linuxUsername>','<game>')` (until 2026-10 it was
+`fileBrowser('<linuxUsername>','<ip>','<game>')`); the ip is the bare address in the
+server's own `data-server="<linuxUsername>"` block. This
 account's Valheim server: `linuxUsername=4RM8tBOucr5l`, ip `170.23.227.3`,
 game `Valheim`. Server-scoped calls send `serverLinuxUsername=<linuxUsername>`.
 
