@@ -7,6 +7,7 @@
 // snapshots, so the page can read live data every few seconds.
 
 const UPSTREAM = "http://170-23-227-3.sslip.io:27021"; // Workers refuse fetch() to a bare IP (error 1003)
+const PUBLIC = "https://valheim-proxy.hunterjsb.workers.dev";
 const ALLOWED_ORIGINS = new Set([
   "https://hunter-jsb.github.io",
   "http://localhost:8899", // local preview
@@ -268,7 +269,37 @@ async function auth(request, url, env) {
   return json({ error: "not found" }, 404);
 }
 
-export default {
+// Statuspage, on the Worker's own cron (deploy.sh sets it): the two components fail
+// independently, so each gets its own probe. A GitHub Actions schedule did this before
+// and ran every 4-6 h instead of every 15 min, so the page could say "up" for hours.
+const STATUSPAGE = "https://api.statuspage.io/v1";
+
+async function probe(run) {
+  try { return (await run()).ok; } catch { return false; }
+}
+
+async function pushStatus(env, ctx) {
+  if (!env.STATUSPAGE_API_KEY || !env.STATUSPAGE_PAGE_ID) return null;
+  const server = await probe(() => fetch(UPSTREAM + "/", { cf: { cacheTtl: 0 } }));
+  // the map runs through this Worker's own /config route, in-process, and can never
+  // look healthier than the server behind it
+  const map = server && await probe(() => handler.fetch(new Request(PUBLIC + "/config"), env, ctx));
+  for (const [id, up] of [[env.STATUSPAGE_SERVER_COMPONENT_ID, server], [env.STATUSPAGE_WEBMAP_COMPONENT_ID, map]]) {
+    if (!id) continue;
+    await fetch(`${STATUSPAGE}/pages/${env.STATUSPAGE_PAGE_ID}/components/${id}.json`, {
+      method: "PATCH",
+      headers: { authorization: "OAuth " + env.STATUSPAGE_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ component: { status: up ? "operational" : "major_outage" } }),
+    });
+  }
+  return { server, map };
+}
+
+const handler = {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(pushStatus(env, ctx));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
         if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors() });
@@ -336,3 +367,6 @@ export default {
     return new Response(upstream.body, { status: upstream.status, headers });
   },
 };
+
+export default handler;
+export { pushStatus };

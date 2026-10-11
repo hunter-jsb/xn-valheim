@@ -17,3 +17,10 @@ curl -sf -4 -X POST \
   -H "Authorization: Bearer ${CF_API_TOKEN}" \
   -H "Content-Type: application/json" --data '{"enabled":true}' | head -c 200
 echo
+# The Statuspage push (pushStatus) runs on the Worker's own cron; its STATUSPAGE_*
+# values are secrets, set once like the rest.
+curl -sf -4 -X PUT \
+  "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/workers/scripts/${NAME}/schedules" \
+  -H "Authorization: Bearer ${CF_API_TOKEN}" \
+  -H "Content-Type: application/json" --data '[{"cron":"*/5 * * * *"}]' | head -c 200
+echo

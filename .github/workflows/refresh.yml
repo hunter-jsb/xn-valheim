@@ -1,8 +1,8 @@
 name: statuspage
 
+# Manual only: the Worker's own cron pushes these every 5 min (worker/valheim-proxy.js
+# pushStatus). GitHub ran this schedule every 4-6 h instead of every 15 min.
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch: {}
 
 concurrency:

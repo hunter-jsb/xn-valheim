@@ -18,7 +18,9 @@ pulumi preview
 Components: **Valheim Server** and **World Map**. The `sdks/` bridge SDK and the
 local `state/` backend are generated/local and gitignored.
 
-Status is pushed by [`../scripts/statuspage_push.py`](../scripts/statuspage_push.py):
+Status is pushed every 5 minutes by the Worker's own cron (`pushStatus` in
+[`../worker/valheim-proxy.js`](../worker/valheim-proxy.js); [`../scripts/statuspage_push.py`](../scripts/statuspage_push.py)
+does the same by hand):
 **Valheim Server** follows the mod's own HTTP endpoint; **World Map** additionally
 requires the Cloudflare Worker the public page reads through, so it can never look
 healthier than the server behind it. Needs `STATUSPAGE_API_KEY`,
