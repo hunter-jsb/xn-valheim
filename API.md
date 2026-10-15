@@ -53,6 +53,10 @@ there is no apply-without-restart path.
 > `InstalledDepots`, which reads exactly like the update having silently failed.
 > Poll that manifest's `buildid` against Steam's published build instead; the panel
 > restarts the server itself when it finishes.
+>
+> Since 2026-10-06 the update fails every time on this host (steamcmd writes a stub manifest with
+> `UpdateResult 9`, downloads nothing, and the server stays down until `/start`); `ops.py update`
+> no longer calls it.
 
 > `saveconfig` fields (captured 2026-09-27 from the dashboard's own form, which is plain
 > HTML on `GET /`, the `<form>` around `id="Crossplay"`): hidden `guid`, `serverLinuxUsername`,

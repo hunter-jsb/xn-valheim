@@ -9,7 +9,7 @@ Auth from env: IB_EMAIL + IB_PASSWORD  (or IB_SESSION = an indifferentSess cooki
   uv run --project scripts scripts/ops.py rcon "save"
   uv run --project scripts scripts/ops.py admins            # print adminlist.txt
   uv run --project scripts scripts/ops.py activity
-  uv run --project scripts scripts/ops.py update              # game version, waits it out
+  uv run --project scripts scripts/ops.py update              # game version: steamcmd here, SFTP up, drain + swap
   uv run --project scripts scripts/ops.py announce "back in 5"
   uv run --project scripts scripts/ops.py restart --warn 60 --reason "map mod update"
   uv run --project scripts scripts/ops.py deploy-web          # the viewer, from ../valheim-webmap/WebMap/web
@@ -55,32 +55,117 @@ def installed_buildid(c, u) -> str:
         return "0"
 
 
-def do_update(c, u):
-    """Trigger the panel update and wait for steamcmd to finish.
+# The panel's own updater fails every time on this host (steamcmd writes a stub manifest
+# with UpdateResult 9 and downloads nothing, leaving the server down). Steam serves the
+# build fine, so the update runs here and only the files that changed go up by SFTP.
+DS = Path(os.environ.get("VALHEIM_DS", "~/.cache/valheim-ds")).expanduser()   # steamcmd/ and install/
+REMOTE_GAME = "steamcmd/valheim/"
+HOST_OWNED = ("BepInEx/", "doorstop", "winhttp.dll", ".bepinex_version", "steamapps/", "docker/")
 
-    The install runs asynchronously and takes 20+ minutes. Starting the server
-    while it downloads aborts it -- the manifest is left at buildid 0 with no
-    installed depots and the old binaries boot again, which looks exactly like
-    the update silently failing. So: never start it here, just wait.
-    """
-    want = steam_buildid()
-    have = installed_buildid(c, u)
+
+def _snapshot(root: Path) -> dict[str, list]:
+    import hashlib
+    snap = {}
+    for d, _, files in os.walk(root):
+        for f in files:
+            p = Path(d) / f
+            rel = str(p.relative_to(root))
+            if rel.startswith(HOST_OWNED):
+                continue
+            h = hashlib.sha1()
+            with open(p, "rb") as fh:
+                for b in iter(lambda: fh.read(1 << 20), b""):
+                    h.update(b)
+            snap[rel] = [p.stat().st_size, h.hexdigest()]
+    return snap
+
+
+def _local_buildid() -> str:
+    m = (DS / "install" / "steamapps" / f"appmanifest_{SERVER_APPID}.acf").read_text()
+    return re.search(r'"buildid"\s+"(\d+)"', m).group(1)
+
+
+def do_update(c, u):
+    """Bring the game server to Steam's build: update a local copy, upload what changed
+    beside the live files, then drain, stop, swap and start, keeping the old files until
+    the new version has booted."""
+    want, have = steam_buildid(), installed_buildid(c, u)
     print(f"steam build {want} | installed {have}")
     if have == want:
         print("already current")
         return
-    print(json.dumps(c.update_version(u))[:120])
-    deadline = time.time() + 45 * 60
-    while time.time() < deadline:
-        time.sleep(60)
-        have = installed_buildid(c, u)
-        left = int((deadline - time.time()) / 60)
-        print(f"  installed {have} (want {want}); {left} min left")
-        if have == want:
-            print("update complete; the panel restarts the server itself")
-            return
-    print("still not installed after 45 min - check the panel", file=sys.stderr)
-    sys.exit(1)
+    steamcmd = DS / "steamcmd" / "steamcmd.sh"
+    if not steamcmd.exists():
+        sys.exit(f"no steamcmd at {steamcmd}: unpack steamcmd_linux.tar.gz there first")
+    before = _snapshot(DS / "install") if (DS / "install").exists() else {}
+    import subprocess
+    subprocess.run([str(steamcmd), "+force_install_dir", str(DS / "install"), "+login", "anonymous",
+                    "+app_update", str(SERVER_APPID), "-beta", "public", "validate", "+quit"],
+                   check=True, stdout=subprocess.DEVNULL)
+    if _local_buildid() != want:
+        sys.exit(f"steamcmd left the local copy at {_local_buildid()}, not {want}")
+    after = _snapshot(DS / "install")
+    changed = sorted(k for k in after if before.get(k) != after[k])
+    removed = sorted(k for k in before if k not in after)
+    print(f"{len(changed)} files changed ({sum(after[k][0] for k in changed) / 1e6:.0f} MB), {len(removed)} removed")
+    t, s = _sftp()
+    try:
+        def exists(p):
+            try:
+                s.stat(p)
+                return True
+            except IOError:
+                return False
+        # the diff only means something if the server holds the build the local copy held
+        for k in changed + removed:
+            if k in before and (not exists(REMOTE_GAME + k) or s.stat(REMOTE_GAME + k).st_size != before[k][0]):
+                sys.exit(f"the server's {k} is not the old local build's: upload the whole install instead")
+        for k in changed:
+            parts = (REMOTE_GAME + k).split("/")[:-1]
+            for i in range(1, len(parts) + 1):
+                if not exists("/".join(parts[:i])):
+                    s.mkdir("/".join(parts[:i]))
+            s.put(str(DS / "install" / k), REMOTE_GAME + k + ".new")
+        print("staged beside the live files; the server is still running")
+        who = running()
+        if who:
+            drain(60, "a game update")
+        print(json.dumps(c.stop(u))[:100])
+        deadline = time.time() + 300
+        while running() is not None:
+            if time.time() > deadline:
+                sys.exit("the server still answers 5 min after stop: nothing swapped; the .new files wait")
+            time.sleep(5)
+        time.sleep(15)                                   # the process writes its saves on the way out
+        for k in changed:
+            if exists(REMOTE_GAME + k):
+                s.posix_rename(REMOTE_GAME + k, REMOTE_GAME + k + ".old")
+            s.posix_rename(REMOTE_GAME + k + ".new", REMOTE_GAME + k)
+        for k in removed:
+            if exists(REMOTE_GAME + k):
+                s.posix_rename(REMOTE_GAME + k, REMOTE_GAME + k + ".old")
+        s.put(str(DS / "install" / "steamapps" / f"appmanifest_{SERVER_APPID}.acf"), MANIFEST + ".new")
+        s.posix_rename(MANIFEST + ".new", MANIFEST)
+        print(json.dumps(c.start(u))[:100])
+        deadline = time.time() + 300
+        while running() is None:
+            if time.time() > deadline:
+                for k in changed + removed:                   # it did not come back: the old build again
+                    if exists(REMOTE_GAME + k + ".old"):
+                        s.posix_rename(REMOTE_GAME + k + ".old", REMOTE_GAME + k)
+                print(json.dumps(c.start(u))[:100])
+                sys.exit("the new build did not come up in 5 min: rolled back to the old files and started")
+            time.sleep(5)
+        time.sleep(20)
+        log = c.read_file(u, "steamcmd/valheim/BepInEx/LogOutput.log")
+        ver = re.findall(r"Valheim version: ([^\n]+)", log)
+        print("booted:", ver[-1] if ver else "no version line yet")
+        for k in changed + removed:
+            if exists(REMOTE_GAME + k + ".old"):
+                s.remove(REMOTE_GAME + k + ".old")
+        print("update complete")
+    finally:
+        t.close()
 
 
 def announce(text: str) -> bool:
