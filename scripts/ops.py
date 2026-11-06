@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+import tarfile
 import time
 import urllib.error
 import urllib.request
@@ -58,7 +59,8 @@ def installed_buildid(c, u) -> str:
 # The panel's own updater fails every time on this host (steamcmd writes a stub manifest
 # with UpdateResult 9 and downloads nothing, leaving the server down). Steam serves the
 # build fine, so the update runs here and only the files that changed go up by SFTP.
-DS = Path(os.environ.get("VALHEIM_DS", "~/.cache/valheim-ds")).expanduser()   # steamcmd/ and install/
+DS = Path(os.environ.get("VALHEIM_DS", "~/.local/share/valheim-ds")).expanduser()   # steamcmd/ and install/; a cache gets wiped, and a lost copy means uploading the whole game
+STEAMCMD_URL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
 REMOTE_GAME = "steamcmd/valheim/"
 HOST_OWNED = ("BepInEx/", "doorstop", "winhttp.dll", ".bepinex_version", "steamapps/", "docker/")
 
@@ -85,6 +87,15 @@ def _local_buildid() -> str:
     return re.search(r'"buildid"\s+"(\d+)"', m).group(1)
 
 
+def _steamcmd() -> Path:
+    path = DS / "steamcmd" / "steamcmd.sh"
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(STEAMCMD_URL) as r, tarfile.open(fileobj=r, mode="r|gz") as tar:
+            tar.extractall(path.parent, filter="data")
+    return path
+
+
 def do_update(c, u):
     """Bring the game server to Steam's build: update a local copy, upload what changed
     beside the live files, then drain, stop, swap and start, keeping the old files until
@@ -94,9 +105,7 @@ def do_update(c, u):
     if have == want:
         print("already current")
         return
-    steamcmd = DS / "steamcmd" / "steamcmd.sh"
-    if not steamcmd.exists():
-        sys.exit(f"no steamcmd at {steamcmd}: unpack steamcmd_linux.tar.gz there first")
+    steamcmd = _steamcmd()
     before = _snapshot(DS / "install") if (DS / "install").exists() else {}
     import subprocess
     subprocess.run([str(steamcmd), "+force_install_dir", str(DS / "install"), "+login", "anonymous",
