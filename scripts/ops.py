@@ -330,11 +330,15 @@ def main():
                          "whenever anyone is online -- see drain().")
     a = ap.parse_args()
 
-    # the deploys talk SFTP, not the panel: no login needed
+    # the deploys talk SFTP and announce talks to the mod, not the panel: no login needed
     if a.cmd == "deploy-web":
         return deploy_web(a.arg)
     if a.cmd == "deploy-mod":
         return deploy_mod(a.arg)
+    if a.cmd == "announce":
+        if not a.arg:
+            sys.exit("usage: ops.py announce '<message>'")
+        sys.exit(0 if announce(a.arg) else 1)
 
     c = _client()
     sv = c.find(a.game)
@@ -342,13 +346,9 @@ def main():
 
     if a.cmd == "status":
         print(json.dumps({"server": sv.__dict__,
-                          "activity": c.activity(u)[:5]}, indent=2, default=str))
+                          "activity": c.activity()[:5]}, indent=2, default=str))
     elif a.cmd == "update":
         do_update(c, u)
-    elif a.cmd == "announce":
-        if not a.arg:
-            sys.exit("usage: ops.py announce '<message>'")
-        sys.exit(0 if announce(a.arg) else 1)
     elif a.cmd in ("start", "stop", "restart"):
         # the panel answers a start on a running server by restarting it, with no drain
         who = running() if a.cmd == "start" else None
@@ -377,7 +377,7 @@ def main():
     elif a.cmd == "admins":
         print(c.read_file(u, ADMINLIST))
     elif a.cmd == "activity":
-        print(json.dumps(c.activity(u), indent=2))
+        print(json.dumps(c.activity(), indent=2))
 
 
 if __name__ == "__main__":

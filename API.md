@@ -25,8 +25,8 @@ Because the cookie lasts only ~24h, unattended automation stores
 ## Server identity
 
 Every server is keyed by a 12-char **`linuxUsername`**, not a numeric id. The
-dashboard embeds each as `fileBrowser('<linuxUsername>','<game>')` (until 2026-10 it was
-`fileBrowser('<linuxUsername>','<ip>','<game>')`); the ip is the bare address in the
+dashboard lists each as `<li data-server="<linuxUsername>" data-game="<game>">` (since
+2026-11; `fileBrowser(...)` calls before that); the ip is the bare address in the
 server's own `data-server="<linuxUsername>"` block. This
 account's Valheim server: `linuxUsername=4RM8tBOucr5l`, ip `170.23.227.3`,
 game `Valheim`. Server-scoped calls send `serverLinuxUsername=<linuxUsername>`.
@@ -115,9 +115,8 @@ This per-subuser × per-server permission matrix is the "roles as code" surface.
 
 ## Activity & account
 
-- `GET /activity-server/<linuxUsername>` → `{"activities":[{"action","timestamp"}]}`.
-- `GET /activity-server-history/<linuxUsername>?page=<n>`.
-- `GET /activity-account`.
+- `GET /activity` → an HTML fragment of the account's actions, newest first (`Start <server name> 22d ago`).
+  The JSON `/activity-server/<linuxUsername>` routes 404 since 2026-11.
 - `GET /billing-data`, `POST /saveaccountdetails`, `POST /save-server-order`.
 
 ## Realtime (socket.io 4.x)

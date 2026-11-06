@@ -71,17 +71,14 @@ class IBClient:
         self._ensure()
         html = self.s.get(f"{BASE}/", timeout=self.timeout).text
         out = []
-        # fileBrowser('<user>','<game>') since 2026-10; it carried the ip as a middle
-        # argument before. The ip is also the bare address shown in the server's own block.
-        for m in re.finditer(r"fileBrowser\('([^']+)'(?:,'([^']+)')?,'([^']+)'\)", html):
-            user, ip, game = m.group(1), m.group(2), m.group(3)
-            if not ip:
-                at = html.find(f'data-server="{user}"')
-                other = re.compile(r'data-server="(?!' + re.escape(user) + r'")')   # the next server's block, not this one's again
-                nxt = other.search(html, at + 1) if at >= 0 else None
-                hit = re.search(r">(\d{1,3}(?:\.\d{1,3}){3})<", html[at:nxt.start() if nxt else None]) if at >= 0 else None
-                ip = hit.group(1) if hit else None
-            out.append(Server(linux_username=user, ip=ip, game=game))
+        # each server's sidebar row has been <li data-server=... data-game=...> since 2026-11;
+        # the ip is the bare address shown in that server's own block.
+        for m in re.finditer(r'<li\b[^>]*\bdata-server="([^"]+)"[^>]*\bdata-game="([^"]+)"', html):
+            user, game = m.group(1), m.group(2)
+            other = re.compile(r'data-server="(?!' + re.escape(user) + r'")')   # the next server's block, not this one's again
+            nxt = other.search(html, m.end())
+            hit = re.search(r">(\d{1,3}(?:\.\d{1,3}){3})<", html[m.start():nxt.start() if nxt else None])
+            out.append(Server(linux_username=user, ip=hit.group(1) if hit else None, game=game))
         return out
 
     def find(self, game: str) -> Server:
@@ -157,8 +154,11 @@ class IBClient:
         return r.json().get("permissions", {})
 
     # ---- activity ---------------------------------------------------------
-    def activity(self, u) -> list[dict]:
+    def activity(self) -> list[dict]:
+        """Newest first, across the account: the per-server JSON route went away in 2026-11."""
         self._ensure()
-        r = self.s.get(f"{BASE}/activity-server/{u}", timeout=self.timeout)
+        r = self.s.get(f"{BASE}/activity", timeout=self.timeout)
         r.raise_for_status()
-        return r.json().get("activities", [])
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r.text))
+        return [{"action": a, "server": s, "when": w}
+                for a, s, w in re.findall(r"(\S+) (.+?) (\d+\w* ago|just now)", text, re.I)]
